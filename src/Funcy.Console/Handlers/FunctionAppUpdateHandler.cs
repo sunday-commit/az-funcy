@@ -21,8 +21,15 @@ public class FunctionAppUpdateHandler : IDetailsLoader
     private readonly AppContext _appContext;
     private readonly FuncySettings _settings;
 
-    private CancellationTokenSource? _syncCts;
-    private Task? _syncTask;
+    // The CancellationTokenSource and its Task are correlated and touched from three entry
+    // points (SynchronizeFunctionAppDataAsync, LoadAllDetailsAsync, OnSubscriptionChanged) on
+    // different threads. Holding them in one immutable object and swapping it with
+    // Interlocked.Exchange lets the pair be replaced atomically, without a lock — the swap
+    // hands the previous scope to exactly one caller, so it is never torn, orphaned, or
+    // disposed twice.
+    private sealed record SyncScope(CancellationTokenSource Cts, Task Task);
+
+    private SyncScope? _scope;
 
     private readonly ConcurrentDictionary<string, DateTime> _lastSubscriptionSyncUtc = new();
 
@@ -61,40 +68,35 @@ public class FunctionAppUpdateHandler : IDetailsLoader
 
     private async Task CancelCurrentSyncAsync()
     {
-        var oldCts = _syncCts;
-        var oldTask = _syncTask;
-        _syncCts = null;
-        _syncTask = null;
-
-        if (oldCts is not null)
+        var scope = Interlocked.Exchange(ref _scope, null);
+        if (scope is null)
         {
-            try
-            {
-                await oldCts.CancelAsync();
-            }
-            catch (ObjectDisposedException)
-            {
-                // Already disposed
-            }
+            return;
         }
 
-        if (oldTask is not null)
+        try
         {
-            try
-            {
-                await oldTask;
-            }
-            catch (OperationCanceledException)
-            {
-                // Expected
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error waiting for old task during subscription change");
-            }
+            await scope.Cts.CancelAsync();
+        }
+        catch (ObjectDisposedException)
+        {
+            // Already disposed
         }
 
-        oldCts?.Dispose();
+        try
+        {
+            await scope.Task;
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error waiting for old task during subscription change");
+        }
+
+        scope.Cts.Dispose();
     }
 
     private bool ShouldRefreshSubscription(string subscriptionId)
@@ -123,9 +125,55 @@ public class FunctionAppUpdateHandler : IDetailsLoader
 
     public async Task SynchronizeFunctionAppDataAsync()
     {
-        _syncCts = new CancellationTokenSource();
-        _syncTask = SynchronizeFunctionAppDataInternalAsync(_syncCts.Token);
-        await _syncTask;
+        await StartSyncScope(SynchronizeFunctionAppDataInternalAsync);
+    }
+
+    /// <summary>
+    /// Atomically replaces any in-flight sync scope with a fresh one running
+    /// <paramref name="work"/> under a new <see cref="CancellationToken"/>. The new scope is
+    /// published with <see cref="Interlocked.Exchange{T}(ref T, T)"/>, which hands the previous
+    /// scope to exactly one caller so it can be retired without a torn pair or an orphaned
+    /// <see cref="CancellationTokenSource"/>.
+    /// </summary>
+    private Task StartSyncScope(Func<CancellationToken, Task> work)
+    {
+        var cts = new CancellationTokenSource();
+        var task = Task.Run(() => work(cts.Token), cts.Token);
+
+        var previous = Interlocked.Exchange(ref _scope, new SyncScope(cts, task));
+        RetireScope(previous);
+        return task;
+    }
+
+    /// <summary>
+    /// Cancels a retired scope without blocking. Its <see cref="CancellationTokenSource"/> is
+    /// disposed only after the task drains, so the token is never disposed while still observed.
+    /// </summary>
+    private void RetireScope(SyncScope? scope)
+    {
+        if (scope is null)
+        {
+            return;
+        }
+
+        try
+        {
+            scope.Cts.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // Already disposed
+        }
+
+        _ = scope.Task.ContinueWith(t =>
+        {
+            if (t.Exception is not null)
+            {
+                _logger.LogDebug(t.Exception, "Retired sync scope ended with an exception");
+            }
+
+            scope.Cts.Dispose();
+        }, TaskScheduler.Default);
     }
 
     private async Task SynchronizeFunctionAppDataInternalAsync(CancellationToken token)
@@ -151,7 +199,6 @@ public class FunctionAppUpdateHandler : IDetailsLoader
 
             _uiStatusState.BeginDetailsRefresh();
             await LoadAllDetailsInBackground(token);
-            _uiStatusState.EndDetailsRefresh();
 
             _lastSubscriptionSyncUtc[_appContext.CurrentSubscription.Id] = DateTime.UtcNow;
         }
@@ -168,6 +215,15 @@ public class FunctionAppUpdateHandler : IDetailsLoader
         {
             _logger.LogError(ex, "Error during synchronization");
             throw;
+        }
+        finally
+        {
+            // Always release the spinner and status flags, even on cancellation, so a sync
+            // that is retired mid-flight does not leave the TopPanel stuck on "Validating…".
+            // All three calls are idempotent.
+            _animationHandler.RemoveAppDetails("TopPanel");
+            _uiStatusState.EndInventoryValidation();
+            _uiStatusState.EndDetailsRefresh();
         }
     }
 
@@ -196,16 +252,12 @@ public class FunctionAppUpdateHandler : IDetailsLoader
     {
         if (!CanRefreshAll()) return;
 
-        _syncCts = new CancellationTokenSource();
-        var token = _syncCts.Token;
-
-        _syncTask = Task.Run(async () =>
+        await StartSyncScope(async token =>
         {
+            _uiStatusState.BeginDetailsRefresh();
             try
             {
-                _uiStatusState.BeginDetailsRefresh();
                 await LoadAllDetailsInBackground(token);
-                _uiStatusState.EndDetailsRefresh();
             }
             catch (OperationCanceledException)
             {
@@ -215,9 +267,11 @@ public class FunctionAppUpdateHandler : IDetailsLoader
             {
                 _logger.LogError(ex, "Error during refresh all");
             }
-        }, token);
-
-        await _syncTask;
+            finally
+            {
+                _uiStatusState.EndDetailsRefresh();
+            }
+        });
     }
 
     public bool CanRefreshAll()

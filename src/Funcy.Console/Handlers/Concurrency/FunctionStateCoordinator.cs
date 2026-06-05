@@ -19,7 +19,7 @@ public class FunctionStateCoordinator
     public event Action<FunctionAppDetails>? OnFunctionAppRemoved;
     public event Action<string, List<FunctionDetails>>? OnFunctionListUpdated;
 
-    public FunctionStateCoordinator(AppContext appContext)
+    public FunctionStateCoordinator()
     {
         _ = ProcessUpdatesAsync();
         _ = ProcessRemovalsAsync();
@@ -162,7 +162,14 @@ public class FunctionStateCoordinator
     {
         await foreach (var removedApp in _removeChannel.Reader.ReadAllAsync())
         {
-            _cache.TryRemove(removedApp.Name, out _);
+            // _cache is keyed by subscription id; the app lives in the inner
+            // per-subscription cache keyed by app name. Evict using the app's
+            // own subscription so a mid-flight subscription switch can't make us
+            // touch the wrong sub-cache.
+            if (_cache.TryGetValue(removedApp.Subscription, out var subCache))
+            {
+                subCache.TryRemove(removedApp.Name, out _);
+            }
 
             await _uiUpdateLock.WaitAsync();
             try

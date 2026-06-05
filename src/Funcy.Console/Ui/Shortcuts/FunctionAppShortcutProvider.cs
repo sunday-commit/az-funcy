@@ -52,7 +52,7 @@ public class FunctionAppShortcutProvider : IShortcutProvider<FunctionAppDetails>
         app is not null && app.State == FunctionState.Running && app.Status.Status != StatusType.InProgress;
 
     private static bool CanSwap(FunctionAppDetails? app) =>
-        app is not null && app.Status.Status != StatusType.InProgress && app.Slots.Count >= 0;
+        app is not null && app.Status.Status != StatusType.InProgress && app.Slots.Count > 0;
 
     private static bool CanRefresh(FunctionAppDetails? app) =>
         app is not null && app.Status.Status != StatusType.InProgress;

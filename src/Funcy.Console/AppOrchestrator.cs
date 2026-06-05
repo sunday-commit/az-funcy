@@ -12,7 +12,6 @@ public class AppOrchestrator(
     ResizeHandler resizeHandler,
     AnimationHandler animationHandler,
     FunctionAppUpdateHandler functionAppUpdateHandler,
-    SubscriptionProbeHandler subscriptionProbeHandler,
     IActionDispatcher actionDispatcher,
     ListPanelContextFactory listPanelContextFactory,
     UiStateMarkupProvider uiStateMarkupProvider,
@@ -28,7 +27,6 @@ public class AppOrchestrator(
             uiStateMarkupProvider, appContext);
         // InitializeAsync is now done in Program.cs before StartAsync
         _ = functionAppUpdateHandler.SynchronizeFunctionAppDataAsync();
-        _ = subscriptionProbeHandler.ProbeAllSubscriptionsAsync(cts.Token);
         
         var resizeTask = resizeHandler.StartPolling(cts.Token);
         var inputTask = inputHandler.StartListeningAsync(cts.Token);

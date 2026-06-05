@@ -12,6 +12,7 @@ public class SubscriptionShortcutProvider(AppContext appContext) : IShortcutProv
         {
             { new TableIndex(0, 2), new ShortcutMap(ListPanelShortcuts.Filter, true) },
             { new TableIndex(0, 3), new ShortcutMap(hideShortcut, true) },
+            { new TableIndex(0, 4), new ShortcutMap(ListPanelShortcuts.ToggleVisibility, slotDetails is not null) },
         };
     }
 
@@ -20,6 +21,7 @@ public class SubscriptionShortcutProvider(AppContext appContext) : IShortcutProv
         return action switch
         {
             FunctionAction.HideSubscription => true,
+            FunctionAction.ToggleSubscriptionVisibility => true,
             _ => false
         };
     }

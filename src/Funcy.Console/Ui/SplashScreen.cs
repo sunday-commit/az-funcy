@@ -43,25 +43,26 @@ public class SplashScreen
     {
         AnsiConsole.Clear();
         AnsiConsole.Cursor.Hide();
-        
+
         ToolValidationResult? validationResult = null;
-        
+        Exception? initException = null;
+
         // Starta animation
         _animationHandler.AddAppDetails(SplashAnimationKey);
-        
+
         await AnsiConsole.Live(Panel)
             .StartAsync(async ctx =>
             {
                 ctx.Refresh();
-                
+
                 var validationTask = _toolValidationService.ValidateRequiredToolsAsync();
                 var allTasks = Task.WhenAll(backgroundTasks.Append(validationTask));
-                
+
                 // Animera medan tasks körs
                 while (!allTasks.IsCompleted)
                 {
                     await Task.WhenAny(allTasks, _animationHandler.WaitForTriggerAsync());
-                    
+
                     if (_animationHandler.IsTriggered)
                     {
                         UpdateInitializingRow();
@@ -69,22 +70,40 @@ public class SplashScreen
                         ctx.Refresh();
                     }
                 }
-                
+
                 // Vänta på att alla tasks är klara
-                await allTasks;
-                
-                validationResult = await validationTask;
-                
-                // Om validation lyckades och det finns en continuation task, kör den nu
-                if (validationResult is not null && validationResult.IsValid && continuationTask is not null)
+                try
                 {
-                    await continuationTask();
+                    await allTasks;
                 }
-                
+                catch (Exception ex)
+                {
+                    initException = ex;
+                }
+
+                validationResult = await validationTask;
+
+                // Om validation lyckades och det finns en continuation task, kör den nu
+                if (initException is null && validationResult is not null && validationResult.IsValid && continuationTask is not null)
+                {
+                    try
+                    {
+                        await continuationTask();
+                    }
+                    catch (Exception ex)
+                    {
+                        initException = ex;
+                    }
+                }
+
                 // Stoppa animation
                 _animationHandler.RemoveAppDetails(SplashAnimationKey);
-                
-                if (validationResult is null || !validationResult.IsValid)
+
+                if (initException is not null)
+                {
+                    UpdatePanelWithException(initException);
+                }
+                else if (validationResult is null || !validationResult.IsValid)
                 {
                     UpdatePanelWithErrors(validationResult);
                 }
@@ -92,13 +111,13 @@ public class SplashScreen
                 {
                     UpdatePanelWithSuccess();
                 }
-                
+
                 ctx.Refresh();
             });
-        
-        
+
+
         System.Console.CursorVisible = false;
-        if (validationResult is null || !validationResult.IsValid)
+        if (initException is not null || validationResult is null || !validationResult.IsValid)
         {
             System.Console.ReadKey(true);
             return false;
@@ -157,5 +176,34 @@ public class SplashScreen
         _contentTable.Rows.Update(2, 0, new Markup("[green]✓[/] All required tools are installed"));
         _contentTable.AddRow(new Markup(""));
         _contentTable.AddRow(new Markup("[gray]Press any key to continue...[/]"));
+    }
+
+    private void UpdatePanelWithException(Exception exception)
+    {
+        var error = InitializationErrorResolver.Resolve(exception);
+
+        _contentTable.Rows.RemoveAt(2);
+
+        _contentTable.AddRow(new Markup($"[bold red]{Markup.Escape(error.Title)}[/]"));
+
+        if (error.Detail is not null)
+        {
+            _contentTable.AddRow(new Markup(""));
+            _contentTable.AddRow(new Markup($"  {Markup.Escape(error.Detail)}"));
+        }
+
+        if (error.Actions.Length > 0)
+        {
+            _contentTable.AddRow(new Markup(""));
+            foreach (var action in error.Actions)
+            {
+                _contentTable.AddRow(new Markup($"  [gray]→[/] [white]{Markup.Escape(action)}[/]"));
+            }
+        }
+
+        _contentTable.AddRow(new Markup(""));
+        _contentTable.AddRow(new Markup("[gray]Press any key to exit...[/]"));
+
+        Panel.BorderColor(Color.Red);
     }
 }

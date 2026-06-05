@@ -49,7 +49,8 @@ public sealed class ListPanelFactory(
     {
         return CreateFromList(
             new FunctionAppMatcher(settings.Value.TagColumns),
-            new FunctionAppLayoutRenderer(settings.Value.TagColumns),
+            new FunctionAppLayoutRenderer(settings.Value.TagColumns, tag =>
+                settings.Value.TagColumnWidths.TryGetValue(tag, out var w) ? w : settings.Value.DefaultTagColumnWidth),
             new FunctionAppShortcutProvider(uiStatusState),
             f => new NavigationRequest(PanelTarget.Functions, f.Key),
             "Azure Function Apps",
@@ -82,8 +83,7 @@ public sealed class ListPanelFactory(
 
         if (appContext.HideEmptySubscriptions)
         {
-            var subsToShow = allSubs.Count(s => !coordinator.IsSubscriptionKnownEmpty(s.Id));
-            var hiddenCount = allSubs.Count - subsToShow;
+            var hiddenCount = allSubs.Count(s => !s.Current && appContext.IsSubscriptionHidden(s.Id));
             header = hiddenCount > 0
                 ? $"Switch Subscription [dim grey]({hiddenCount} hidden - H to show)[/]"
                 : "Switch Subscription";

@@ -1,4 +1,3 @@
-using Funcy.Console.Handlers.Concurrency;
 using Funcy.Core.Model;
 using Funcy.Infrastructure.Azure;
 using Microsoft.Extensions.Logging;
@@ -7,19 +6,19 @@ namespace Funcy.Console.Handlers;
 
 public class SubscriptionProbeHandler(
     IAzureResourceService azureResourceService,
-    FunctionStateCoordinator coordinator,
     AppContext appContext,
     ILogger<SubscriptionProbeHandler> logger)
 {
     public async Task ProbeAllSubscriptionsAsync(CancellationToken token)
     {
-        var subscriptions = appContext.GetSnapshot()
-            .Where(s => !s.Current)
-            .ToList();
+        var subscriptions = appContext.GetUnprobedSubscriptions();
+        logger.LogInformation("Probing {Count} subscriptions", subscriptions.Count);
 
-        using var throttler = new SemaphoreSlim(3, 3);
+        using var throttler = new SemaphoreSlim(8, 8);
         var tasks = subscriptions.Select(sub => ProbeSubscriptionAsync(sub, throttler, token));
         await Task.WhenAll(tasks);
+
+        logger.LogInformation("Subscription probe complete");
     }
 
     private async Task ProbeSubscriptionAsync(SubscriptionDetails sub, SemaphoreSlim throttler, CancellationToken token)
@@ -28,11 +27,7 @@ public class SubscriptionProbeHandler(
         try
         {
             var hasApps = await azureResourceService.HasAnyFunctionAppsAsync(sub.Id);
-            if (!hasApps)
-            {
-                coordinator.MarkSubscriptionAsEmpty(sub.Id);
-                logger.LogInformation("Subscription {SubscriptionId} has no function apps", sub.Id);
-            }
+            await appContext.RecordProbeResultAsync(sub.Id, hasApps);
         }
         catch (OperationCanceledException)
         {
@@ -40,7 +35,7 @@ public class SubscriptionProbeHandler(
         }
         catch (Exception e)
         {
-            logger.LogWarning(e, "Failed to probe subscription {SubscriptionId}", sub.Id);
+            logger.LogWarning(e, "Failed to probe '{Name}' ({SubscriptionId})", sub.Name, sub.Id);
         }
         finally
         {

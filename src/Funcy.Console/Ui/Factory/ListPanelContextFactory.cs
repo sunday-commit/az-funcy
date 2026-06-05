@@ -38,7 +38,7 @@ public sealed class ListPanelContextFactory(
 
         var allSubs = appContext.GetSnapshot().ToList();
         var subsToShow = appContext.HideEmptySubscriptions
-            ? allSubs.Where(s => !coordinator.IsSubscriptionKnownEmpty(s.Id)).ToList()
+            ? allSubs.Where(s => s.Current || !appContext.IsSubscriptionHidden(s.Id)).ToList()
             : allSubs;
         
         var controller = new SnapshotListController<SubscriptionDetails>(view, subsToShow, invalidate);

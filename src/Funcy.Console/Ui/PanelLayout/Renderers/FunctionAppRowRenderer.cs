@@ -3,7 +3,7 @@ using Spectre.Console;
 
 namespace Funcy.Console.Ui.PanelLayout.Renderers;
 
-public class FunctionAppLayoutRenderer(IReadOnlyList<string> tagColumns) : ILayoutRenderer<FunctionAppDetails>
+public class FunctionAppLayoutRenderer(IReadOnlyList<string> tagColumns, Func<string, int> getColumnWidth) : ILayoutRenderer<FunctionAppDetails>
 {
     public RowMarkup CreateRowMarkup(FunctionAppDetails item)
     {
@@ -36,7 +36,7 @@ public class FunctionAppLayoutRenderer(IReadOnlyList<string> tagColumns) : ILayo
         foreach (var tag in tagColumns)
         {
             var tagCopy = tag;
-            columns.Add(new Column<FunctionAppDetails>(tagCopy, f => f.Tags.TryGetValue(tagCopy, out var v) ? v : null, 10));
+            columns.Add(new Column<FunctionAppDetails>(tagCopy, f => f.Tags.TryGetValue(tagCopy, out var v) ? v : null, getColumnWidth(tagCopy)));
         }
 
         columns.Add(new Column<FunctionAppDetails>("State", f => f.State, 10));

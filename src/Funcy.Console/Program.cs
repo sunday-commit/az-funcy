@@ -119,11 +119,19 @@ var dbMigrationTask = host.Services.MigrateDatabaseAsync(CancellationToken.None)
 var appContext = host.Services.GetRequiredService<AppContext>();
 var appContextInitTask = appContext.InitializeAppContext();
 
+// Starta subscription probe direkt när subscriptions laddats - väntar i splash screen
+var subscriptionProbeHandler = host.Services.GetRequiredService<SubscriptionProbeHandler>();
+var probeTask = appContextInitTask.ContinueWith(
+    t => t.IsCompletedSuccessfully
+        ? subscriptionProbeHandler.ProbeAllSubscriptionsAsync(CancellationToken.None)
+        : Task.CompletedTask,
+    TaskScheduler.Default).Unwrap();
+
 // Hämta functionAppUpdateHandler för continuation
 var functionAppUpdateHandler = host.Services.GetRequiredService<FunctionAppUpdateHandler>();
 
 var canContinue = await splashScreen.ShowAsync(
-    [dbMigrationTask, appContextInitTask],
+    [dbMigrationTask, appContextInitTask, probeTask],
     async () => await functionAppUpdateHandler.InitializeAsync());
 
 if (!canContinue)

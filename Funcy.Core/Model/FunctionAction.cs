@@ -8,7 +8,8 @@ public enum FunctionAction
     Refresh,
     RefreshAll,
     ChangeSubscription,
-    HideSubscription
+    HideSubscription,
+    ToggleSubscriptionVisibility
 }
 
 public static class FunctionActionExtensions

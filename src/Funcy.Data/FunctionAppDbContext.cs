@@ -45,4 +45,5 @@ public class FunctionAppDbContext : DbContext
     public DbSet<Function> Functions { get; set; }
     public DbSet<FunctionAppSlot> FunctionAppSlots { get; set; }
     public DbSet<FunctionAppTag> FunctionAppTags { get; set; }
+    public DbSet<SubscriptionSetting> SubscriptionSettings { get; set; }
 }

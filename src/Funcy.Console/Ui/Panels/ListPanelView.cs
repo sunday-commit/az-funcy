@@ -245,7 +245,7 @@ public class ListPanelView<T> : IActionHandlingPanel, IListPanelView<T> where T 
     public bool IsActionValid(FunctionAction action)
     {
         var selectedItem = GetSelectedItem();
-        return selectedItem is not null && _shortcuts.IsActionValid(selectedItem, action);
+        return _shortcuts.IsActionValid(selectedItem, action);
     }
     
     public void SortViewBy(int keyInfoKey)

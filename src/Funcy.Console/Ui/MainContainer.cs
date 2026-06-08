@@ -73,6 +73,9 @@ public sealed class MainContainer : IDisposable
 
     public void HandleUpdate()
     {
+        // Render any pending background model changes here, on the render thread — the only
+        // place allowed to touch the Spectre table. Background updates merely flag the view.
+        Current.View.RenderIfNeeded();
         UpdateShortcuts();
         UpdateUiStatus();
     }

@@ -1,11 +1,25 @@
 namespace Funcy.Console.Ui.Pagination;
 
-public class ListPanelPaginator()
+public class ListPanelPaginator
 {
     public int SelectedIndex { get; private set; }
     public int VisibleStartIndex{ get; private set; }
     private int _amountOfRows;
     public int MaxVisibleRows { get; private set; }
+
+    // Window height source. Defaults to the real console; injectable so the paginator/view can
+    // be exercised in headless tests (System.Console.WindowHeight throws without a console).
+    private readonly Func<int> _windowHeight;
+
+    public ListPanelPaginator(Func<int>? windowHeight = null)
+    {
+        _windowHeight = windowHeight ?? (() => System.Console.WindowHeight);
+
+        // Ensure a valid window height before the first render. Previously SetItems primed
+        // this via UpdateTotalRows; the targeted SetAll/Upsert path no longer does, so a
+        // one-shot snapshot (e.g. the subscriptions panel) would otherwise Take(0) and show nothing.
+        UpdateMaxVisibleRows();
+    }
 
     public void UpdateTotalRows(int amountOfRows)
     {
@@ -105,6 +119,6 @@ public class ListPanelPaginator()
     
     public void UpdateMaxVisibleRows()
     {
-        MaxVisibleRows = System.Console.WindowHeight - 8;
+        MaxVisibleRows = _windowHeight() - 8;
     }
 }

@@ -25,9 +25,8 @@ public sealed class FunctionListController : ListPanelControllerBase<FunctionDet
         _uiStatusState = uiStatusState;
         FunctionAppKey = appKey;
         
-        Store.UpdateAll(initial);
+        View.SetAll(initial.ToList());
         PushStatusToView(_uiStatusState.GetSnapshot());
-        PushSnapshotToView();
         _invalidate?.Invoke();
         
         _coordinator.OnFunctionListUpdated += OnListUpdated;
@@ -38,8 +37,7 @@ public sealed class FunctionListController : ListPanelControllerBase<FunctionDet
     {
         if (string.Equals(FunctionAppKey, functionAppKey))
         {
-            Store.UpdateAll(updated);
-            PushSnapshotToView();
+            View.SetAll(updated);
             _invalidate?.Invoke();
         }
 

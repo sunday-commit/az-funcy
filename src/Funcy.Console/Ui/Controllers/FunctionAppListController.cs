@@ -29,8 +29,7 @@ public sealed class FunctionAppListController : ListPanelControllerBase<Function
 
     private void OnCacheInit(List<FunctionAppDetails> functionAppDetailsList)
     {
-        Store.UpdateAll(_coordinator.GetCachedFunctionAppDetails());
-        PushSnapshotToView();
+        View.SetAll(_coordinator.GetCachedFunctionAppDetails());
         _invalidate?.Invoke();
     }
 
@@ -42,15 +41,13 @@ public sealed class FunctionAppListController : ListPanelControllerBase<Function
 
     private void OnUpdated(FunctionAppDetails updated)
     {
-        Store.UpsertMany([updated]);
-        PushSnapshotToView();
+        View.Upsert(updated);
         _invalidate?.Invoke();
     }
-    
+
     private void OnRemoved(FunctionAppDetails removed)
     {
-        Store.RemoveMany([removed]);
-        PushSnapshotToView();
+        View.Remove(removed.Key);
         _invalidate?.Invoke();
     }
 

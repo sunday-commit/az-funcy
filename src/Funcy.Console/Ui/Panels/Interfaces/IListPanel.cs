@@ -18,6 +18,9 @@ public interface IListPanel
     void SortViewBy(int keyInfoKey);
     bool IsActionValid(FunctionAction action);
     void RenderCurrentView();
+    // Renders pending background changes. Must be called on the render thread (the only
+    // thread allowed to touch the Spectre table).
+    void RenderIfNeeded();
     string GetSelectedItemKey();
     UiStatusSnapshot GetUiStatusSnapshot();
 }

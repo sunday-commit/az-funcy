@@ -11,8 +11,7 @@ public sealed class SnapshotListController<T> : ListPanelControllerBase<T>
     public SnapshotListController(IListPanelView<T> view, IEnumerable<T> initial,
         Action? invalidate = null) : base(view)
     {
-        Store.UpdateAll(initial);
-        PushSnapshotToView();
+        View.SetAll(initial.ToList());
         invalidate?.Invoke();
     }
 }

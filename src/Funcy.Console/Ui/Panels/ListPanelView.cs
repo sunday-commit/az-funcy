@@ -27,23 +27,32 @@ public class ListPanelView<T> : IActionHandlingPanel, IListPanelView<T> where T 
     private readonly Func<FunctionAction, T, InputActionResult?>? _onAction; 
     private readonly Func<UiStatusSnapshot, string?>? _emptyStateMessage;
 
-    private readonly Dictionary<string, RowMarkup> _markupCache = [];
+    // Single source of truth for this panel, guarded by _gate. Items, their pre-rendered
+    // markup, and the lazily-sorted view all live here — replacing the old controller-owned
+    // ListPanelDataStore, the IReadOnlyList handoff, and a duplicate item index.
+    private readonly Lock _gate = new();
+    private readonly Dictionary<string, T> _items = new();
+    private readonly Dictionary<string, RowMarkup> _markupCache = new(StringComparer.Ordinal);
+    private List<T> _sortedCache = [];
+    private bool _sortDirty = true;
+    // Set by background model updates; consumed on the render thread in RenderIfNeeded so the
+    // Spectre table is only ever written from one thread.
+    private bool _needsRender;
+
     private List<RowMarkup> _visibleRows = [];
-    
+
     public Panel Panel { get; }
-    
+
     private readonly ListPanelPaginator _paginator;
     private readonly ListPanelTableRenderer<T> _renderer;
     private string _searchText = "";
-    private IReadOnlyList<T> _snapshot = [];
-    private Dictionary<string, T> _itemIndex = new();
     private UiStatusSnapshot _uiStatus;
 
 
     public ListPanelView(ISearchMatcher<T> searchMatcher,
         ILayoutRenderer<T> layoutRenderer, IShortcutProvider<T> shortcuts, IAnimationProvider animationProvider, Func<T, NavigationRequest>? onEnterNavigation, string header,
         Func<FunctionAction, T, InputActionResult?>? onAction, Func<T, NavigationRequest>? onActionNavigation,
-        Func<UiStatusSnapshot, string?>? emptyStateMessage = null)
+        Func<UiStatusSnapshot, string?>? emptyStateMessage = null, Func<int>? windowHeight = null)
 
     {
         _searchMatcher = searchMatcher;
@@ -54,7 +63,7 @@ public class ListPanelView<T> : IActionHandlingPanel, IListPanelView<T> where T 
         _onAction = onAction;
         _onActionNavigation = onActionNavigation;
         _emptyStateMessage = emptyStateMessage;
-        _paginator = new ListPanelPaginator();
+        _paginator = new ListPanelPaginator(windowHeight);
         
         var columnLayout = _layoutRenderer.CreateColumnLayout();
         _renderer = new ListPanelTableRenderer<T>(columnLayout);
@@ -68,19 +77,61 @@ public class ListPanelView<T> : IActionHandlingPanel, IListPanelView<T> where T 
             .BorderColor(Color.Orange1);
     }
     
-    public void SetItems(IReadOnlyList<T> items)
+    // SetAll/Upsert/Remove/SetUiStatus are invoked from background (controller) threads. They
+    // only mutate the model and flag the view dirty; the controller's invalidate() then wakes
+    // the render loop, which renders on the main thread via RenderIfNeeded.
+    public void SetAll(IReadOnlyList<T> items)
     {
-        _snapshot = items;
-        _paginator.UpdateTotalRows(items.Count);
-        _itemIndex = items.ToDictionary(x => x.Key);
-        BuildCache();
-        RefreshView();
+        lock (_gate)
+        {
+            _items.Clear();
+            _markupCache.Clear();
+            foreach (var item in items)
+            {
+                _items[item.Key] = item;
+                _markupCache[item.Key] = _layoutRenderer.CreateRowMarkup(item);
+            }
+
+            _sortDirty = true;
+            _needsRender = true;
+        }
+    }
+
+    public void Upsert(T item)
+    {
+        lock (_gate)
+        {
+            _items[item.Key] = item;
+            // Only this row's markup is rebuilt. This is what turns the old O(N²) refresh
+            // (every row rebuilt on every single-item update) into O(1) work per change.
+            _markupCache[item.Key] = _layoutRenderer.CreateRowMarkup(item);
+            _sortDirty = true;
+            _needsRender = true;
+        }
+    }
+
+    public void Remove(string key)
+    {
+        lock (_gate)
+        {
+            if (!_items.Remove(key))
+            {
+                return;
+            }
+
+            _markupCache.Remove(key);
+            _sortDirty = true;
+            _needsRender = true;
+        }
     }
 
     public void SetUiStatus(UiStatusSnapshot uiStatusSnapshot)
     {
         _uiStatus = uiStatusSnapshot;
-        RenderCurrentView();
+        lock (_gate)
+        {
+            _needsRender = true;
+        }
     }
 
     public void HandleResize()
@@ -121,13 +172,18 @@ public class ListPanelView<T> : IActionHandlingPanel, IListPanelView<T> where T 
 
     private T? GetSelectedItem()
     {
-        if (_visibleRows.Count == 0)
+        var rows = _visibleRows;
+        if (rows.Count == 0)
         {
             return default;
         }
-        var selectedItemKey = _visibleRows[_paginator.SelectedIndex].Key;
-        _itemIndex.TryGetValue(selectedItemKey, out var item);
-        return item;
+
+        var selectedItemKey = rows[_paginator.SelectedIndex].Key;
+        lock (_gate)
+        {
+            _items.TryGetValue(selectedItemKey, out var item);
+            return item;
+        }
     }
     
     public string GetSelectedItemKey()
@@ -137,8 +193,28 @@ public class ListPanelView<T> : IActionHandlingPanel, IListPanelView<T> where T 
     
     private void RefreshView()
     {
+        lock (_gate)
+        {
+            _needsRender = false;
+        }
+
         RebuildVisibleRows();
         RenderCurrentView();
+    }
+
+    // Called on the render (main) thread. Background updates only flag the view dirty; the
+    // rebuild + Spectre table mutation happens here so the table is never written concurrently.
+    public void RenderIfNeeded()
+    {
+        lock (_gate)
+        {
+            if (!_needsRender)
+            {
+                return;
+            }
+        }
+
+        RefreshView();
     }
 
     public void RenderCurrentView()
@@ -154,51 +230,58 @@ public class ListPanelView<T> : IActionHandlingPanel, IListPanelView<T> where T 
 
     private void RebuildVisibleRows()
     {
-        var (appsToShow, totalCount) = GetVisibleItems();
+        List<RowMarkup> rows;
+        int totalCount;
 
-        _visibleRows = appsToShow
-            .Select(app => _markupCache[app.Key])
-            .ToList();
+        lock (_gate)
+        {
+            var sorted = GetSortedItemsLocked();
 
+            IReadOnlyList<T> candidates = string.IsNullOrWhiteSpace(_searchText)
+                ? sorted
+                : sorted.Where(item => _searchMatcher.TryMatch(item, _searchText)).ToList();
+
+            totalCount = candidates.Count;
+
+            // Keep short result sets visible: if everything fits, ignore the scroll offset.
+            var skip = candidates.Count < _paginator.MaxVisibleRows ? 0 : _paginator.VisibleStartIndex;
+
+            rows = candidates
+                .Skip(skip)
+                .Take(_paginator.MaxVisibleRows)
+                .Select(item => _markupCache[item.Key])
+                .ToList();
+        }
+
+        _visibleRows = rows;
         _paginator.UpdateTotalRows(totalCount);
     }
 
-    private (IEnumerable<T> appsToShow, int totalCount) GetVisibleItems()
+    // Sorts by the active column (falling back to the model's natural IComparable order) and
+    // caches the result until the model or the sort column changes. Call while holding _gate.
+    private List<T> GetSortedItemsLocked()
     {
-        var sortedSnapshot = _sorter.Sort(_snapshot);
-        
-        if (string.IsNullOrWhiteSpace(_searchText))
-        { 
-            return (
-                sortedSnapshot.Skip(_paginator.VisibleStartIndex).Take(_paginator.MaxVisibleRows),
-                sortedSnapshot.Count
-            );
+        if (!_sortDirty)
+        {
+            return _sortedCache;
         }
 
-        var filtered = sortedSnapshot
-            .Select(app => new { App = app, IsMatch = _searchMatcher.TryMatch(app, _searchText) })
-            .Where(x => x.IsMatch)
-            .ToList();
-        
-        var skip = filtered.Count < _paginator.MaxVisibleRows ? 0 : _paginator.VisibleStartIndex; //kanske kan skippas och vi kör _paginator.VisibleStartIndex bara enligt gippy
-
-        return (
-            filtered.Skip(skip).Take(_paginator.MaxVisibleRows).Select(x => x.App),
-            filtered.Count
-        );
+        var items = _items.Values.ToList();
+        items.Sort();                                 // natural order (stable base for column sort)
+        _sortedCache = _sorter.Sort(items).ToList();  // active column, or unchanged if none
+        _sortDirty = false;
+        return _sortedCache;
     }
     
-    private void BuildCache()
-    {
-        foreach (var app in _snapshot)
-        {
-            _markupCache[app.Key] = _layoutRenderer.CreateRowMarkup(app);
-        }
-    }
-
     private string? GetEmptyStateMessage()
     {
-        if (!string.IsNullOrWhiteSpace(_searchText) || _snapshot.Count > 0)
+        int count;
+        lock (_gate)
+        {
+            count = _items.Count;
+        }
+
+        if (!string.IsNullOrWhiteSpace(_searchText) || count > 0)
         {
             return null;
         }
@@ -252,6 +335,11 @@ public class ListPanelView<T> : IActionHandlingPanel, IListPanelView<T> where T 
     {
         _sorter.Toggle(keyInfoKey);
         _renderer.ToggleSortingColumn(_sorter.CurrentColumn, _sorter.Desc);
+        lock (_gate)
+        {
+            _sortDirty = true;
+        }
+
         RefreshView();
     }
 

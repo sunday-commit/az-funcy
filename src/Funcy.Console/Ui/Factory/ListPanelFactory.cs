@@ -10,7 +10,6 @@ using Funcy.Console.Ui.Panels;
 using Funcy.Console.Ui.Panels.Interfaces;
 using Funcy.Console.Ui.Shortcuts;
 using Funcy.Core.Model;
-using Microsoft.Extensions.Options;
 
 namespace Funcy.Console.Ui.Factory;
 
@@ -18,7 +17,7 @@ public sealed class ListPanelFactory(
     FunctionStateCoordinator coordinator,
     IAnimationProvider animationProvider,
     AppContext appContext,
-    IOptions<FuncySettings> settings,
+    IFuncySettingsService settingsService,
     IUiStatusState uiStatusState)
 {
     public IListPanel CreateFromList<T>(
@@ -45,12 +44,23 @@ public sealed class ListPanelFactory(
     }
 
 
-    public IListPanel CreateFunctionAppPanel(IReadOnlyList<FunctionAppDetails> apps)
+    public IListPanel CreateSettingsPanel()
     {
         return CreateFromList(
-            new FunctionAppMatcher(settings.Value.TagColumns),
-            new FunctionAppLayoutRenderer(settings.Value.TagColumns, tag =>
-                settings.Value.TagColumnWidths.TryGetValue(tag, out var w) ? w : settings.Value.DefaultTagColumnWidth),
+            new SettingMatcher(),
+            new SettingLayoutRenderer(),
+            new SettingShortcutProvider(),
+            null,
+            "Settings");
+    }
+
+    public IListPanel CreateFunctionAppPanel(IReadOnlyList<FunctionAppDetails> apps)
+    {
+        var settings = settingsService.Current;
+        return CreateFromList(
+            new FunctionAppMatcher(settings.TagColumns),
+            new FunctionAppLayoutRenderer(settings.TagColumns, tag =>
+                settings.TagColumnWidths.TryGetValue(tag, out var w) ? w : settings.DefaultTagColumnWidth),
             new FunctionAppShortcutProvider(uiStatusState),
             f => new NavigationRequest(PanelTarget.Functions, f.Key),
             "Azure Function Apps",

@@ -35,7 +35,9 @@ public class ShortcutProviderGridTests
         Assert.Equal(new ShortcutMap(ListPanelShortcuts.Start, false), grid[new TableIndex(1, 2)]);
         Assert.Equal(new ShortcutMap(ListPanelShortcuts.Stop, true), grid[new TableIndex(1, 3)]);
         Assert.Equal(new ShortcutMap(ListPanelShortcuts.ChangeSubscription, true), grid[new TableIndex(1, 4)]);
-        Assert.Equal(7, grid.Count);
+        // feat/settings-view: the Options shortcut (O) was added to the app panel grid.
+        Assert.Equal(new ShortcutMap(ListPanelShortcuts.Options, true), grid[new TableIndex(1, 5)]);
+        Assert.Equal(8, grid.Count);
     }
 
     [Fact]

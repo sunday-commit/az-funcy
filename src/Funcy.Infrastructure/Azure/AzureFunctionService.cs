@@ -247,16 +247,26 @@ public class AzureFunctionService(
                 var config = websiteFunction.Data.Config.ToObjectFromJson<FunctionConfig>(new JsonSerializerOptions
                     { PropertyNameCaseInsensitive = true });
                 var trigger = "";
+                ServiceBusTriggerTarget? serviceBusTarget = null;
                 if (config is not null)
                 {
                     var triggerBinding = config.Bindings.FirstOrDefault(b =>
                         b.Type.EndsWith("Trigger", StringComparison.OrdinalIgnoreCase) &&
                         (b.Direction == null || b.Direction.Equals("in", StringComparison.OrdinalIgnoreCase)));
                     trigger = triggerBinding?.Type ?? "";
+                    serviceBusTarget = ServiceBusBindingReader.TryRead(config);
                 }
 
                 functionList.Add(new Function
-                    { AzureId = websiteFunction.Id.ToString(), Name = websiteFunction.Id.Name, Trigger = Capitalize(trigger) });
+                {
+                    AzureId = websiteFunction.Id.ToString(),
+                    Name = websiteFunction.Id.Name,
+                    Trigger = Capitalize(trigger),
+                    QueueName = serviceBusTarget?.QueueName,
+                    TopicName = serviceBusTarget?.TopicName,
+                    SubscriptionName = serviceBusTarget?.SubscriptionName,
+                    ConnectionSetting = serviceBusTarget?.ConnectionSetting
+                });
             }
 
             sw.Stop();

@@ -21,6 +21,7 @@ public sealed class FunctionListController : ListPanelControllerBase<FunctionDet
     private readonly IUiStatusState _uiStatusState;
     private readonly string _functionAppKey;
 
+    private readonly Lock _countGate = new();
     private CancellationTokenSource? _countCts;
 
     public FunctionListController(IListPanelView<FunctionDetails> view,
@@ -80,11 +81,14 @@ public sealed class FunctionListController : ListPanelControllerBase<FunctionDet
             return;
         }
 
-        _countCts?.Cancel();
-        _countCts?.Dispose();
-        var cts = new CancellationTokenSource();
-        _countCts = cts;
-        var token = cts.Token;
+        CancellationToken token;
+        lock (_countGate)
+        {
+            _countCts?.Cancel();
+            _countCts?.Dispose();
+            _countCts = new CancellationTokenSource();
+            token = _countCts.Token;
+        }
 
         foreach (var function in serviceBusFunctions)
         {
@@ -142,8 +146,12 @@ public sealed class FunctionListController : ListPanelControllerBase<FunctionDet
     {
         _coordinator.OnFunctionListUpdated -= OnListUpdated;
         _uiStatusState.Changed -= OnUiStatusChanged;
-        _countCts?.Cancel();
-        _countCts?.Dispose();
+        lock (_countGate)
+        {
+            _countCts?.Cancel();
+            _countCts?.Dispose();
+            _countCts = null;
+        }
         base.Dispose();
     }
 }

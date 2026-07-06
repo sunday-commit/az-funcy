@@ -9,7 +9,9 @@ public enum FunctionAction
     RefreshAll,
     ChangeSubscription,
     HideSubscription,
-    ToggleSubscriptionVisibility
+    ToggleSubscriptionVisibility,
+    ViewAppSettings,
+    ToggleMask
 }
 
 public static class FunctionActionExtensions

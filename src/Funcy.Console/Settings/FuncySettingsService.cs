@@ -32,11 +32,15 @@ public sealed class FuncySettingsService : IFuncySettingsService
         }
     }
 
+    public event Action? ColumnsChanged;
+
     public Task UpdateAsync(Action<FuncySettings> mutate)
     {
+        FuncySettings previous;
         FuncySettings updated;
         lock (_gate)
         {
+            previous = _current;
             updated = Clone(_current);
         }
 
@@ -48,7 +52,41 @@ public sealed class FuncySettingsService : IFuncySettingsService
             _current = updated;
         }
 
+        if (ColumnsDiffer(previous, updated))
+        {
+            ColumnsChanged?.Invoke();
+        }
+
         return Task.CompletedTask;
+    }
+
+    // True when a column-shaping setting differs, so a listener can rebuild affected panels.
+    private static bool ColumnsDiffer(FuncySettings a, FuncySettings b)
+    {
+        if (!a.TagColumns.SequenceEqual(b.TagColumns))
+        {
+            return true;
+        }
+
+        if (a.DefaultTagColumnWidth != b.DefaultTagColumnWidth)
+        {
+            return true;
+        }
+
+        if (a.TagColumnWidths.Count != b.TagColumnWidths.Count)
+        {
+            return true;
+        }
+
+        foreach (var (key, value) in a.TagColumnWidths)
+        {
+            if (!b.TagColumnWidths.TryGetValue(key, out var other) || other != value)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static FuncySettings Clone(FuncySettings source) => new()

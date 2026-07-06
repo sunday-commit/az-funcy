@@ -12,6 +12,10 @@ public static class FunctionDetailsMapper
             FunctionAppName = function.FunctionApp?.Name ?? string.Empty,
             Name = function.Name,
             Trigger = function.Trigger,
+            QueueName = function.QueueName,
+            TopicName = function.TopicName,
+            SubscriptionName = function.SubscriptionName,
+            ConnectionSetting = function.ConnectionSetting,
             IsDisabled = function.IsDisabled
         };
     }

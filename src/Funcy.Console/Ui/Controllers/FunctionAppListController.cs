@@ -25,6 +25,11 @@ public sealed class FunctionAppListController : ListPanelControllerBase<Function
         _coordinator.OnFunctionAppUpdated += OnUpdated;
         _coordinator.OnFunctionAppRemoved += OnRemoved;
         _uiStatusState.Changed += OnUiStatusChanged;
+
+        // Seed from the current cache so a controller created after the cache is already populated
+        // (e.g. a live column rebuild) shows the apps immediately instead of waiting for the next
+        // update. Harmless at startup where the cache is still empty.
+        View.SetAll(_coordinator.GetCachedFunctionAppDetails());
     }
 
     private void OnCacheInit(List<FunctionAppDetails> functionAppDetailsList)

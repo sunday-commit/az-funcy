@@ -11,3 +11,7 @@ public record GraphQueryResponse(
     int TotalCount);
 
 public record FunctionAppGraphRow(string Id, string Name, string State, Dictionary<string, string> Tags, string ResourceGroup, string SubscriptionId);
+
+public record NamespaceGraphResponse(int Count, List<NamespaceGraphRow> Data);
+
+public record NamespaceGraphRow(string Id, string Name);

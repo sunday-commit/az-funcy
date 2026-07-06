@@ -93,6 +93,26 @@ public class ListPanelViewBypassTests
         view.RenderIfNeeded();
 
         Assert.Equal(["extenda-app", "opti-app"], view.GetVisibleKeys());
+        // Active rows floated with no filter still use normal (never dim) markup.
+        Assert.Empty(layout.BypassKeys);
+    }
+
+    [Fact]
+    public void RebuildVisibleRows_NoFilter_FloatsActiveRowsToTopWithoutBypassMarkup()
+    {
+        var layout = new TrackingLayoutRenderer();
+        var view = MakeView(layout);
+        view.SetAll([
+            new OpItem("aaa-idle", active: false),
+            new OpItem("mmm-idle", active: false),
+            new OpItem("zzz-active", active: true), // sorts last but has an active operation
+        ]);
+
+        view.RenderIfNeeded();
+
+        // Active row floats to the top even without a filter; idle rows keep their relative order.
+        Assert.Equal(["zzz-active", "aaa-idle", "mmm-idle"], view.GetVisibleKeys());
+        // Floated-but-unfiltered rows are not "bypassed", so no dim bypass markup is produced.
         Assert.Empty(layout.BypassKeys);
     }
 

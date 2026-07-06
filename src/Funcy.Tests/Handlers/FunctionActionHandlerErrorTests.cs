@@ -108,5 +108,7 @@ public class FunctionActionHandlerErrorTests
         public IAsyncEnumerable<FunctionAppFetchResult> GetFunctionAppFunctionsAndSlotsAsync(
             List<FunctionAppDetails> functionAppDetails, CancellationToken cancellationToken)
             => throw new NotSupportedException();
+
+        public Task SetPinnedAsync(string azureId, bool isPinned) => throw new NotSupportedException();
     }
 }

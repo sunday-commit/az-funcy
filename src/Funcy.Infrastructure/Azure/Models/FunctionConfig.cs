@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Funcy.Infrastructure.Azure.Models;
 
@@ -15,5 +16,9 @@ public class Binding
     public required string Type { get; set; }
     public string? Direction { get; set; }
     public string? Name { get; set; }
-    public Dictionary<string, JsonElement> Extra { get; set; } =  new();
+
+    // Catch-all for binding-specific properties (queueName, topicName, subscriptionName,
+    // connection, ...) that are not modelled explicitly.
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement> Extra { get; set; } = new();
 }

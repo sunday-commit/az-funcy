@@ -54,4 +54,60 @@ public class FuncySettingsServiceTests : IDisposable
         Assert.Equal(60, before.SubscriptionRefreshIntervalMinutes);
         Assert.NotSame(before, service.Current);
     }
+
+    [Fact]
+    public async Task UpdateAsync_FiresColumnsChanged_WhenTagColumnsChange()
+    {
+        var service = MakeService();
+        var fired = 0;
+        service.ColumnsChanged += () => fired++;
+
+        await service.UpdateAsync(s => s.TagColumns = ["System"]);
+
+        Assert.Equal(1, fired);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_FiresColumnsChanged_WhenWidthsChange()
+    {
+        var service = MakeService();
+        var fired = 0;
+        service.ColumnsChanged += () => fired++;
+
+        await service.UpdateAsync(s => s.DefaultTagColumnWidth = 40);
+        await service.UpdateAsync(s => s.TagColumnWidths = new Dictionary<string, int> { ["System"] = 12 });
+
+        Assert.Equal(2, fired);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_DoesNotFireColumnsChanged_WhenOnlyIrrelevantSettingChanges()
+    {
+        var service = MakeService();
+        var fired = 0;
+        service.ColumnsChanged += () => fired++;
+
+        // Only the refresh interval changes; it does not shape the columns.
+        await service.UpdateAsync(s => s.SubscriptionRefreshIntervalMinutes = 5);
+
+        Assert.Equal(0, fired);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_DoesNotFireColumnsChanged_WhenColumnValuesAreUnchanged()
+    {
+        var service = new FuncySettingsService(
+            new FuncySettings { TagColumns = ["System"], DefaultTagColumnWidth = 20 }, _path);
+        var fired = 0;
+        service.ColumnsChanged += () => fired++;
+
+        // Re-committing identical column values must not trigger a rebuild.
+        await service.UpdateAsync(s =>
+        {
+            s.TagColumns = ["System"];
+            s.DefaultTagColumnWidth = 20;
+        });
+
+        Assert.Equal(0, fired);
+    }
 }

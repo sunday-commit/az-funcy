@@ -32,7 +32,8 @@ public static class FunctionAppDetailsMapper
             Tags = functionApp.Tags.ToDictionary(t => t.Key, t => t.Value),
             Functions = functionApp.Functions.Select(x => x.Map()).ToList(),
             Slots = functionApp.Slots.Select(x => x.Map()).ToList(),
-            LastUpdated = functionApp.UpdatedAt
+            LastUpdated = functionApp.UpdatedAt,
+            IsPinned = functionApp.IsPinned
         };
     }
 }

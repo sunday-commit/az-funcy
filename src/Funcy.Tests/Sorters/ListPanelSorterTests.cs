@@ -1,11 +1,17 @@
 using Funcy.Console.Ui.PanelLayout;
 using Funcy.Console.Ui.Pagination.Sorters;
+using Funcy.Core.Model;
 using Xunit;
 
 namespace Funcy.Tests.Sorters;
 
 public class ListPanelSorterTests
 {
+    private sealed record PinItem(string Name, bool IsPinned) : IPinnable;
+
+    private static ListPanelSorter<PinItem> MakePinSorter()
+        => new(new ColumnLayout<PinItem>(new Column<PinItem>("Name", p => p.Name)));
+
     private static ListPanelSorter<string> MakeSorter(int columnCount = 3)
     {
         var columns = Enumerable.Range(1, columnCount)
@@ -98,5 +104,62 @@ public class ListPanelSorterTests
         sorter.Toggle(1); // Desc = true
         var result = sorter.Sort(["c", "a", "b"]);
         Assert.Equal(["c", "b", "a"], result);
+    }
+
+    [Fact]
+    public void Sort_NoColumn_FloatsPinnedItemsToTop_PreservingNaturalOrder()
+    {
+        var sorter = MakePinSorter();
+        // Caller passes items already in natural order; pinned group must move up but keep order.
+        var source = new List<PinItem>
+        {
+            new("alpha", false),
+            new("bravo", true),
+            new("charlie", false),
+            new("delta", true)
+        };
+
+        var result = sorter.Sort(source).Select(p => p.Name).ToList();
+
+        Assert.Equal(["bravo", "delta", "alpha", "charlie"], result);
+    }
+
+    [Fact]
+    public void Sort_ColumnAscending_KeepsPinnedFirstThenSortsByColumn()
+    {
+        var sorter = MakePinSorter();
+        sorter.Toggle(1); // ascending by Name
+        var source = new List<PinItem>
+        {
+            new("charlie", false),
+            new("delta", true),
+            new("alpha", false),
+            new("bravo", true)
+        };
+
+        var result = sorter.Sort(source).Select(p => p.Name).ToList();
+
+        // Pinned group first (sorted asc), then the rest (sorted asc).
+        Assert.Equal(["bravo", "delta", "alpha", "charlie"], result);
+    }
+
+    [Fact]
+    public void Sort_ColumnDescending_KeepsPinnedFirstThenSortsByColumnDesc()
+    {
+        var sorter = MakePinSorter();
+        sorter.Toggle(1);
+        sorter.Toggle(1); // descending by Name
+        var source = new List<PinItem>
+        {
+            new("charlie", false),
+            new("delta", true),
+            new("alpha", false),
+            new("bravo", true)
+        };
+
+        var result = sorter.Sort(source).Select(p => p.Name).ToList();
+
+        // Pinned group first (sorted desc), then the rest (sorted desc).
+        Assert.Equal(["delta", "bravo", "charlie", "alpha"], result);
     }
 }

@@ -15,11 +15,25 @@ public class FunctionAppLayoutRenderer(IReadOnlyList<string> tagColumns, Func<st
         {
             Key = item.Key
         };
+        // Pinned apps get a glyph prefix; the Name sort key stays item.Name so ordering is unaffected.
+        var pinPrefix = item.IsPinned ? $"{UiStyles.PinGlyph} " : string.Empty;
 
-        var unselectedName = bypassed ? UiStyles.CreateBypassNameCell(item.Name) : new Markup(item.Name);
-        var selectedName = bypassed
-            ? UiStyles.CreateSelectedCell($"{UiStyles.BypassGlyph} {item.Name}")
-            : UiStyles.CreateSelectedCell(item.Name);
+        Markup selectedName;
+        Markup unselectedName;
+        if (bypassed)
+        {
+            selectedName = UiStyles.CreateSelectedCell($"{pinPrefix}{UiStyles.BypassGlyph} {item.Name}");
+            unselectedName = item.IsPinned
+                ? new Markup($"[{UiStyles.Sort}]{UiStyles.PinGlyph}[/] " + $"[{UiStyles.Bypass}]{UiStyles.BypassGlyph} {item.Name}[/]")
+                : UiStyles.CreateBypassNameCell(item.Name);
+        }
+        else
+        {
+            selectedName = UiStyles.CreateSelectedCell($"{pinPrefix}{item.Name}");
+            unselectedName = item.IsPinned
+                ? new Markup($"[{UiStyles.Sort}]{UiStyles.PinGlyph}[/] {item.Name}")
+                : new Markup(item.Name);
+        }
         rowMarkup.Add("Name", new RowCell(selectedName, unselectedName));
 
         foreach (var tag in tagColumns)

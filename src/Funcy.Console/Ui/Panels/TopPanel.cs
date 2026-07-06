@@ -70,7 +70,8 @@ public class TopPanel
         });
         _dataTable.AddColumn("", column =>
         {
-            column.Width = 15;
+            // Wide enough for the longest shortcut label rendered here, "<D> Disable/Enable".
+            column.Width = 19;
             column.LeftAligned();
         });
         _dataTable.AddColumn("", column =>
@@ -83,6 +84,11 @@ public class TopPanel
             column.Width = 18;
             column.LeftAligned();
         });
+        _dataTable.AddColumn("", column =>
+        {
+            column.Width = 15;
+            column.LeftAligned();
+        });
 
         _renderedShortcuts.Add(new TableIndex(0, 2), new ShortcutMap(ListPanelShortcuts.Filter, true));
         _renderedShortcuts.Add(new TableIndex(0, 3), new ShortcutMap(ListPanelShortcuts.Swap, true));
@@ -92,9 +98,10 @@ public class TopPanel
         _renderedShortcuts.Add(new TableIndex(1, 3), new ShortcutMap(ListPanelShortcuts.Stop, true));
         _renderedShortcuts.Add(new TableIndex(1, 4), new ShortcutMap(ListPanelShortcuts.ChangeSubscription, true));
         _renderedShortcuts.Add(new TableIndex(1, 5), new ShortcutMap(ListPanelShortcuts.Options, true));
+        _renderedShortcuts.Add(new TableIndex(0, 6), new ShortcutMap(ListPanelShortcuts.Pin, true));
 
-        _dataTable.AddRow(UiStyles.CreateLabelMarkup("Subscription:"), new Markup($"{_subscriptionName}"), new Markup(""), new Markup(""), new Markup(""), new Markup(""));
-        _dataTable.AddRow(UiStyles.CreateLabelMarkup("Filter:"), new Markup(""), new Markup(""), new Markup(""), new Markup(""), new Markup(""));
+        _dataTable.AddRow(UiStyles.CreateLabelMarkup("Subscription:"), new Markup($"{_subscriptionName}"), new Markup(""), new Markup(""), new Markup(""), new Markup(""), new Markup(""));
+        _dataTable.AddRow(UiStyles.CreateLabelMarkup("Filter:"), new Markup(""), new Markup(""), new Markup(""), new Markup(""), new Markup(""), new Markup(""));
 
         UpdateShortcuts();
     }

@@ -10,10 +10,12 @@ Funcy har en solid kärna: snabb cache-först-listning av Function Apps, start/s
 
 | Feature | Branch | PR |
 |---|---|---|
-| Settings-vy i appen (ersätter handredigering av settings.json) | `feat/settings-view` | *(fylls i)* |
-| Service Bus-insikt: queue/topic+subscription per SB-triggad funktion, aktiva meddelanden + DLQ | `feat/servicebus-trigger-insight` | *(fylls i)* |
-| App Insights-loggvy per funktion: nära realtid, typfilter (traces/exceptions/requests), fritextsök | `feat/appinsights-logs` | *(fylls i)* |
-| Favoriter/pinnade Function Apps (P), sorteras överst, persisteras | `feat/pinned-function-apps` | *(fylls i)* |
+| Settings-vy i appen (ersätter handredigering av settings.json), öppnas med `O` | `feat/settings-view` | [#25](https://github.com/Rudenw/Funcy/pull/25) |
+| Service Bus-insikt: queue/topic+subscription per SB-triggad funktion, aktiva meddelanden + DLQ | `feat/servicebus-trigger-insight` | [#27](https://github.com/Rudenw/Funcy/pull/27) |
+| App Insights-loggvy per funktion (Enter på funktion): nära realtid, `E` typfilter, `F` fritextsök | `feat/appinsights-logs` | [#28](https://github.com/Rudenw/Funcy/pull/28) |
+| Favoriter/pinnade Function Apps (`P`), sorteras överst, persisteras | `feat/pinned-function-apps` | [#26](https://github.com/Rudenw/Funcy/pull/26) |
+
+Alla fyra implementerades av delegerade agenter och granskades därefter manuellt: varje diff kodgranskades, byggdes om från scratch och testkördes. Två granskningsfynd åtgärdades innan PR: en saknad exception-guard i pin-togglen (#26) och en disposal-race i loggvyns poll-loop (#28).
 
 ## Ytterligare features som borde finnas (ej implementerade nu)
 

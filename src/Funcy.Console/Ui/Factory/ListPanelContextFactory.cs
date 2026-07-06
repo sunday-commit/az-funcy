@@ -6,7 +6,9 @@ using Funcy.Console.Ui.Controllers;
 using Funcy.Console.Ui.Navigation;
 using Funcy.Console.Ui.Panels;
 using Funcy.Console.Ui.Panels.Interfaces;
+using Funcy.Core.Interfaces;
 using Funcy.Core.Model;
+using Microsoft.Extensions.Logging;
 
 namespace Funcy.Console.Ui.Factory;
 
@@ -14,6 +16,8 @@ public sealed class ListPanelContextFactory(
     FunctionStateCoordinator coordinator,
     ListPanelFactory listPanelFactory,
     IUiStatusState uiStatusState,
+    IServiceBusInsightService serviceBusInsightService,
+    ILogger<FunctionListController> functionListLogger,
     IFuncySettingsService settingsService,
     AppContext appContext)
 {
@@ -75,7 +79,8 @@ public sealed class ListPanelContextFactory(
             case PanelTarget.Functions:
             {
                 var view = (IListPanelView<FunctionDetails>)panel;
-                var controller = new FunctionListController(view, app.Key, app.Functions, coordinator, uiStatusState, invalidate);
+                var controller = new FunctionListController(view, app.Key, app.Functions, coordinator,
+                    serviceBusInsightService, functionListLogger, uiStatusState, invalidate);
                 return new ListPanelContext
                 {
                     View = panel,

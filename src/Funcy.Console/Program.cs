@@ -101,6 +101,7 @@ var host = Host.CreateDefaultBuilder(args)
         services.AddTransient<IAzureFunctionService, AzureFunctionService>();
         services.AddTransient<IFunctionAppManagementService, FunctionAppManagementService>();
         services.AddScoped<IAzureResourceService, AzureResourceService>();
+        services.AddSingleton<IServiceBusInsightService, ServiceBusInsightService>();
         services.AddSingleton<TokenCredential, DefaultAzureCredential>();
         services.AddTransient<ToolValidationService>();
         services.AddTransient<SplashScreen>();

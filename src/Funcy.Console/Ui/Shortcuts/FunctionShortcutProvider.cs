@@ -10,6 +10,7 @@ public class FunctionShortcutProvider : IShortcutProvider<FunctionDetails>
         {
             {new TableIndex(0, 2), new ShortcutMap(ListPanelShortcuts.Filter, true)},
             {new TableIndex(0, 3), new ShortcutMap(ListPanelShortcuts.DisableEnable, CanToggle(function))},
+            {new TableIndex(0, 4), new ShortcutMap(ListPanelShortcuts.Refresh, true)},
         };
         return shortcutList;
     }
@@ -19,6 +20,7 @@ public class FunctionShortcutProvider : IShortcutProvider<FunctionDetails>
         return action switch
         {
             FunctionAction.ToggleDisabled => CanToggle(getSelectedItem),
+            FunctionAction.Refresh => true,
             _ => false
         };
     }

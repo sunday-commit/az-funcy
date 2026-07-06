@@ -3,6 +3,7 @@ using System;
 using Funcy.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Funcy.Data.Migrations
 {
     [DbContext(typeof(FunctionAppDbContext))]
-    partial class FunctionAppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260706064619_AddServiceBusTriggerColumns")]
+    partial class AddServiceBusTriggerColumns
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.7");
@@ -31,9 +34,6 @@ namespace Funcy.Data.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<long>("FunctionAppId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<bool>("IsDisabled")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
@@ -69,9 +69,6 @@ namespace Funcy.Data.Migrations
                     b.Property<string>("AzureId")
                         .IsRequired()
                         .HasColumnType("TEXT");
-
-                    b.Property<bool>("IsPinned")
-                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
                         .IsRequired()

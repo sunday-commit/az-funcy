@@ -9,12 +9,13 @@ public class FunctionShortcutProvider : IShortcutProvider<FunctionDetails>
         var shortcutList = new Dictionary<TableIndex, ShortcutMap>
         {
             {new TableIndex(0, 2), new ShortcutMap(ListPanelShortcuts.Filter, true)},
+            {new TableIndex(0, 3), new ShortcutMap(ListPanelShortcuts.Refresh, true)},
         };
         return shortcutList;
     }
 
-    public bool IsActionValid(FunctionDetails getSelectedItem, FunctionAction action)
+    public bool IsActionValid(FunctionDetails? getSelectedItem, FunctionAction action)
     {
-        return false;
+        return action == FunctionAction.Refresh;
     }
 }

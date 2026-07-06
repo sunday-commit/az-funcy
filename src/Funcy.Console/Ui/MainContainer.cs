@@ -1,5 +1,6 @@
 using Funcy.Console.Ui.ConsoleHelper;
 using Funcy.Console.Ui.Contexts;
+using Funcy.Console.Ui.Controllers;
 using Funcy.Console.Ui.Factory;
 using Funcy.Console.Ui.Panels;
 using Funcy.Console.Ui.Panels.Interfaces;
@@ -216,14 +217,20 @@ public sealed class MainContainer : IDisposable
 
     private void LoadDetails()
     {
-        var currentKey = Current.View.GetSelectedItemKey();
-
         if (!Current.View.IsActionValid(FunctionAction.Refresh))
         {
             return;
         }
 
-        _detailsLoader.LoadDetails(currentKey);
+        // On the Functions panel, Refresh re-runs the controller's Service Bus count fetch
+        // rather than reloading the (already loaded) function app details.
+        if (Current.Controller is ICountRefreshable refreshable)
+        {
+            refreshable.Refresh();
+            return;
+        }
+
+        _detailsLoader.LoadDetails(Current.View.GetSelectedItemKey());
     }
 
     private void LoadAllDetails()

@@ -8,23 +8,20 @@ namespace Funcy.Console.Ui.Renderers;
 public class ListPanelTableRenderer<T>
 {
     private readonly IReadOnlyList<Column<T>> _columns;
+    private readonly ColumnLayout<T> _columnLayout;
     public Table Table { get; set; }
-    
-    public ListPanelTableRenderer(ColumnLayout<T> columnLayout, int width = 115)
+
+    public ListPanelTableRenderer(ColumnLayout<T> columnLayout, int width = AdaptiveLayout.MinTableWidth)
     {
         Table = new Table();
         Table.Border(TableBorder.None);
-        Table.Width(width);
+        _columnLayout = columnLayout;
         _columns = columnLayout.Columns;
         var index = 1;
         foreach (var column in _columns)
         {
             var tableColumn = new TableColumn(UiStyles.CreateHeaderText(column.Header, column.Selector is not null ? index : null, false));
             index++;
-            if (column.Width > 0)
-            {
-                tableColumn.Width(column.Width);
-            }
 
             if (column.Alignment is { } alignment)
             {
@@ -32,6 +29,24 @@ public class ListPanelTableRenderer<T>
             }
 
             Table.AddColumn(tableColumn);
+        }
+
+        ApplyWidth(width);
+    }
+
+    // Re-flows the table to a new target width: each column takes its resolved (flexed) width and
+    // the table itself is pinned to the target so the panel is filled edge to edge. Must be called
+    // on the render thread (it mutates the Spectre table).
+    public void ApplyWidth(int tableWidth)
+    {
+        Table.Width(tableWidth);
+        var resolved = _columnLayout.Resolve(tableWidth);
+        for (var i = 0; i < _columns.Count; i++)
+        {
+            if (resolved[i] > 0)
+            {
+                Table.Columns[i].Width(resolved[i]);
+            }
         }
     }
 

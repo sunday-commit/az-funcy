@@ -19,6 +19,11 @@ public class FunctionAppUpdateHandler : IDetailsLoader
     private readonly FunctionStatusManager _functionStatusManager;
     private readonly AppContext _appContext;
     private readonly IFuncySettingsService _settingsService;
+    private readonly IServiceBusInsightService _serviceBusInsightService;
+
+    // Cap on concurrent Service Bus count fetches during the app-list background pass, mirroring
+    // the details fan-out throttle.
+    private const int ServiceBusFetchConcurrency = 4;
 
     // The CancellationTokenSource and its Task are correlated and touched from three entry
     // points (SynchronizeFunctionAppDataAsync, LoadAllDetailsAsync, OnSubscriptionChanged) on
@@ -39,7 +44,8 @@ public class FunctionAppUpdateHandler : IDetailsLoader
         IUiStatusState uiStatusState,
         FunctionStatusManager functionStatusManager,
         AppContext appContext,
-        IFuncySettingsService settingsService)
+        IFuncySettingsService settingsService,
+        IServiceBusInsightService serviceBusInsightService)
     {
         _logger = logger;
         _functionService = functionService;
@@ -49,6 +55,7 @@ public class FunctionAppUpdateHandler : IDetailsLoader
         _functionStatusManager = functionStatusManager;
         _appContext = appContext;
         _settingsService = settingsService;
+        _serviceBusInsightService = serviceBusInsightService;
 
         _appContext.OnSubscriptionChange += OnSubscriptionChanged;
     }
@@ -232,6 +239,101 @@ public class FunctionAppUpdateHandler : IDetailsLoader
         _uiStatusState.SetTotalDetails(allApps.Count);
         var updatedFunctionApps = _functionService.GetFunctionAppFunctionsAndSlotsAsync(allApps, token);
         await UpdateFunctionAppList(updatedFunctionApps, token);
+
+        // Counts depend on the functions fetched above, so this always runs after the details pass.
+        // It is a no-op (zero extra work, zero Azure calls) unless the setting is enabled. Shares
+        // the caller's cancellation token (the SyncScope) so it is torn down with the sync it follows.
+        await FetchServiceBusCountsForAllAppsAsync(token);
+    }
+
+    // Fans out Service Bus count fetches across the apps that actually have SB triggers, throttled
+    // like the details pass. Each app publishes its own StateOnly update as its sums arrive, so the
+    // list rows fill in progressively.
+    private async Task FetchServiceBusCountsForAllAppsAsync(CancellationToken token)
+    {
+        if (!_settingsService.Current.ShowServiceBusInAppList)
+        {
+            return;
+        }
+
+        // Detail updates published above are applied asynchronously; wait for them to drain into the
+        // cache so every app's freshly fetched functions are visible before we pick apps to fetch.
+        await _functionStateCoordinator.WaitForPendingUpdatesAsync();
+
+        var apps = ServiceBusCountFetchPlanner.AppsToFetch(
+            _settingsService.Current.ShowServiceBusInAppList,
+            _functionStateCoordinator.GetCachedFunctionAppDetails());
+        if (apps.Count == 0)
+        {
+            return;
+        }
+
+        using var throttler = new SemaphoreSlim(ServiceBusFetchConcurrency);
+        var tasks = apps.Select(async app =>
+        {
+            await throttler.WaitAsync(token);
+            try
+            {
+                await FetchServiceBusCountsForAppAsync(app, token);
+            }
+            finally
+            {
+                throttler.Release();
+            }
+        });
+
+        await Task.WhenAll(tasks);
+    }
+
+    // Resolves counts for one app's SB-triggered functions, mutates the cached model in place and
+    // republishes it so the row re-renders (model mutation + invalidate only, per the threading
+    // rule). Never throws for per-app failures; cancellation propagates.
+    private async Task FetchServiceBusCountsForAppAsync(FunctionAppDetails app, CancellationToken token)
+    {
+        if (string.IsNullOrEmpty(app.Id))
+        {
+            return;
+        }
+
+        var serviceBusFunctions = app.Functions.Where(f => f.IsServiceBusTrigger).ToList();
+        if (serviceBusFunctions.Count == 0)
+        {
+            return;
+        }
+
+        try
+        {
+            var results = await _serviceBusInsightService.GetCountsAsync(app.Id, serviceBusFunctions, token);
+            if (token.IsCancellationRequested)
+            {
+                return;
+            }
+
+            var byKey = serviceBusFunctions.ToDictionary(f => f.Key);
+            foreach (var result in results)
+            {
+                if (!byKey.TryGetValue(result.FunctionKey, out var function))
+                {
+                    continue;
+                }
+
+                function.ActiveMessages = result.ActiveMessages;
+                function.DeadLetteredMessages = result.DeadLetteredMessages;
+                function.CountStatus = result.Success
+                    ? ServiceBusCountStatus.Loaded
+                    : ServiceBusCountStatus.Failed;
+            }
+
+            await _functionStateCoordinator.PublishUpdateAsync(app);
+        }
+        catch (OperationCanceledException)
+        {
+            // Superseded by a newer sync or subscription switch.
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to fetch Service Bus counts for app {App}", app.Key);
+        }
     }
 
     public void LoadDetails(string currentKey)
@@ -244,6 +346,17 @@ public class FunctionAppUpdateHandler : IDetailsLoader
             await _functionStatusManager.BeginOperation(functionAppDetails, FunctionAction.Refresh);
             var updatedDetails = await _functionService.GetFunctionAppDetails(functionAppDetails);
             await _functionStatusManager.CompleteOperation(updatedDetails, FunctionAction.Refresh, true);
+
+            // R on the app list also refreshes the selected app's aggregated counts (no-op unless
+            // the setting is enabled). CompleteOperation publishes a StateOnly update, which
+            // MergeUpdate resolves by preserving the cached function instances rather than the
+            // freshly-mapped ones. Align updatedDetails with those preserved instances so the
+            // counts we resolve and republish land on the rows the list actually renders.
+            if (_settingsService.Current.ShowServiceBusInAppList)
+            {
+                updatedDetails.Functions = functionAppDetails.Functions;
+                await FetchServiceBusCountsForAppAsync(updatedDetails, CancellationToken.None);
+            }
         });
     }
 

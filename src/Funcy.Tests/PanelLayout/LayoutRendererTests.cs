@@ -89,10 +89,11 @@ public class LayoutRendererTests
     // ---- FunctionLayoutRenderer ----
 
     [Fact]
-    public void Function_ColumnLayout_IsNameAndTrigger()
+    public void Function_ColumnLayout_IsNameTriggerAndState()
     {
+        // feat/function-disable-toggle: functions list gained the Enabled/Disabled State column.
         var layout = new FunctionLayoutRenderer().CreateColumnLayout();
-        Assert.Equal(["Name", "Trigger"], layout.Columns.Select(c => c.Header));
+        Assert.Equal(["Name", "Trigger", "State"], layout.Columns.Select(c => c.Header));
     }
 
     [Fact]

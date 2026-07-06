@@ -172,12 +172,14 @@ public class ShortcutProviderGridTests
     // ---- FunctionShortcutProvider ----
 
     [Fact]
-    public void Function_Grid_IsFilterOnly()
+    public void Function_Grid_IsFilterAndDisableEnable()
     {
+        // feat/function-disable-toggle: D toggles the selected function's disabled state.
         var sut = new FunctionShortcutProvider();
         var grid = sut.Describe(new FunctionDetails { Name = "fn", FunctionAppName = "appA", Trigger = "t" });
-        Assert.Single(grid);
+        Assert.Equal(2, grid.Count);
         Assert.Equal(new ShortcutMap(ListPanelShortcuts.Filter, true), grid[new TableIndex(0, 2)]);
+        Assert.Equal(new ShortcutMap(ListPanelShortcuts.DisableEnable, true), grid[new TableIndex(0, 3)]);
     }
 
     [Theory]

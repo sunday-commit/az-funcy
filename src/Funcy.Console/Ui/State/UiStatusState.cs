@@ -70,7 +70,10 @@ public sealed class UiStatusState : IUiStatusState
     {
         if (Interlocked.Exchange(ref _isInventoryValidating, 0) == 0)
             return;
-        
+
+        // Inventory validation completing is a data refresh, so stamp the "last updated"
+        // timestamp surfaced as LastInventoryRefreshUtcTicks (details refresh stamps it too).
+        Volatile.Write(ref _lastDetailsRefreshUtcTicks, DateTime.UtcNow.Ticks);
         QueueChanged();
     }
 

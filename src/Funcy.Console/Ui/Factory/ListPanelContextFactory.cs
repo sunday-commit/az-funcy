@@ -5,6 +5,7 @@ using Funcy.Console.Ui.Controllers;
 using Funcy.Console.Ui.Navigation;
 using Funcy.Console.Ui.Panels;
 using Funcy.Console.Ui.Panels.Interfaces;
+using Funcy.Core.Interfaces;
 using Funcy.Core.Model;
 
 namespace Funcy.Console.Ui.Factory;
@@ -13,7 +14,9 @@ public sealed class ListPanelContextFactory(
     FunctionStateCoordinator coordinator,
     ListPanelFactory listPanelFactory,
     IUiStatusState uiStatusState,
-    AppContext appContext)
+    AppContext appContext,
+    ILogQueryExecutor logQueryExecutor,
+    IAppInsightsResolver appInsightsResolver)
 {
     public ListPanelContext CreateRoot(Action invalidate)
     {
@@ -71,6 +74,19 @@ public sealed class ListPanelContextFactory(
             {
                 var view = (IListPanelView<FunctionAppSlotDetails>)panel;
                 var controller = new SnapshotListController<FunctionAppSlotDetails>(view, app.Slots, invalidate);
+                return new ListPanelContext
+                {
+                    View = panel,
+                    Controller = controller
+                };
+            }
+            case PanelTarget.FunctionLogs:
+            {
+                var view = (IListPanelView<LogEntryDetails>)panel;
+                var functionName = request.SecondaryKey ?? "";
+                var controller = new FunctionLogsController(
+                    view, logQueryExecutor, appInsightsResolver,
+                    app.Id, app.Name, functionName, invalidate);
                 return new ListPanelContext
                 {
                     View = panel,

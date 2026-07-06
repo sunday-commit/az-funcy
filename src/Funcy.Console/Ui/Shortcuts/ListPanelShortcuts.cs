@@ -12,6 +12,7 @@ public static class ListPanelShortcuts
     public static readonly Shortcut HideEmpty = new(ConsoleKey.H, "H", "Hide empty");
     public static readonly Shortcut ShowAll = new(ConsoleKey.H, "H", "Show all");
     public static readonly Shortcut ToggleVisibility = new(ConsoleKey.X, "X", "Toggle hidden");
+    public static readonly Shortcut TypeFilter = new(ConsoleKey.E, "E", "Type");
 }
 
 public record TableIndex(int Row, int Column);

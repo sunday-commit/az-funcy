@@ -118,13 +118,24 @@ public sealed class ListPanelFactory(
                 return CreateFromList(new FunctionMatcher(),
                     new FunctionLayoutRenderer(),
                     new FunctionShortcutProvider(),
-                    null,
+                    // Enter opens the function's Application Insights log panel. Key resolves the
+                    // owning app via the coordinator; SecondaryKey carries the function name.
+                    f => new NavigationRequest(PanelTarget.FunctionLogs, f.FunctionAppName, f.Name),
                     "Azure Functions",
                     emptyStateMessage: uiStatus =>
                     {
                         var currentApp = coordinator.TryGet(request.Key);
                         return currentApp is null ? null : UiStyles.CreateFunctionsEmptyStateText(currentApp, uiStatus);
                     });
+            }
+            case PanelTarget.FunctionLogs:
+            {
+                var functionName = request.SecondaryKey ?? "";
+                return CreateFromList(new LogEntryMatcher(),
+                    new LogEntryLayoutRenderer(),
+                    new LogEntryShortcutProvider(),
+                    null,
+                    $"Logs: {Spectre.Console.Markup.Escape(functionName)}");
             }
             case PanelTarget.Slots:
             {

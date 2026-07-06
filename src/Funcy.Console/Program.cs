@@ -1,6 +1,7 @@
 using System.Text;
 using Azure.Core;
 using Azure.Identity;
+using Azure.Monitor.Query;
 using Azure.ResourceManager;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -86,6 +87,9 @@ var host = Host.CreateDefaultBuilder(args)
             var credential = sp.GetRequiredService<DefaultAzureCredential>();
             return new ArmClient(credential);
         });
+        services.AddSingleton(sp => new LogsQueryClient(sp.GetRequiredService<DefaultAzureCredential>()));
+        services.AddSingleton<ILogQueryExecutor, LogQueryExecutor>();
+        services.AddSingleton<IAppInsightsResolver, AppInsightsResolver>();
         services.AddSingleton<AnimationHandler>();
         services.AddSingleton<IAnimationProvider>(sp => sp.GetRequiredService<AnimationHandler>());
         services.AddSingleton<FunctionStateCoordinator>();

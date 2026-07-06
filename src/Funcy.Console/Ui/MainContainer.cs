@@ -127,6 +127,11 @@ public sealed class MainContainer : IDisposable
                 break;
 
             case var key when
+                key == ListPanelShortcuts.TypeFilter.Key:
+                Current.Controller.ToggleTypeFilter();
+                break;
+
+            case var key when
                 key == ListPanelShortcuts.RefreshAll.Key:
                 LoadAllDetails();
                 break;
@@ -218,12 +223,15 @@ public sealed class MainContainer : IDisposable
     {
         var currentKey = Current.View.GetSelectedItemKey();
 
-        if (!Current.View.IsActionValid(FunctionAction.Refresh))
+        if (Current.View.IsActionValid(FunctionAction.Refresh))
         {
+            _detailsLoader.LoadDetails(currentKey);
             return;
         }
 
-        _detailsLoader.LoadDetails(currentKey);
+        // Panels that own live data (e.g. logs) react to Refresh via their controller instead of
+        // the app-details loader. Default controllers treat this as a no-op.
+        Current.Controller.Refresh();
     }
 
     private void LoadAllDetails()

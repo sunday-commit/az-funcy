@@ -10,4 +10,8 @@ public interface IListPanelView<T> : IListPanel where T : IComparable<T>, IHasKe
     void Upsert(T item);
     void Remove(string key);
     void SetUiStatus(UiStatusSnapshot uiStatusSnapshot);
+    // Live panels update their header (filter/last-poll hint) and empty-state text as data
+    // arrives. Both only flag the view; the render thread applies them in RenderIfNeeded.
+    void SetHeader(string header);
+    void SetEmptyStateMessage(string? message);
 }

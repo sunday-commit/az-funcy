@@ -5,6 +5,7 @@ using Funcy.Console.Ui;
 using Funcy.Console.Ui.Input;
 using Funcy.Core.Interfaces;
 using Funcy.Core.Model;
+using Funcy.Infrastructure.Azure;
 using Microsoft.Extensions.Logging;
 
 namespace Funcy.Console.Handlers;
@@ -14,7 +15,8 @@ public class FunctionActionHandler(
     IAzureFunctionService functionService,
     FunctionStatusManager functionStatusManager,
     FunctionStateCoordinator coordinator,
-    ILogger<FunctionActionHandler> logger) : IActionDispatcher
+    ILogger<FunctionActionHandler> logger,
+    IAzureSessionMonitor sessionMonitor) : IActionDispatcher
 {
     private readonly ConcurrentDictionary<string, DispatchedFunction> _currentTasks = [];
 
@@ -79,8 +81,9 @@ public class FunctionActionHandler(
 
             await functionStatusManager.CompleteOperation(details, inputResult.Action, true);
         }
-        catch
+        catch (Exception ex)
         {
+            sessionMonitor.ReportPossibleAuthFailure(ex);
             await functionStatusManager.CompleteOperation(details, inputResult.Action, false);
         }
         finally
@@ -117,6 +120,7 @@ public class FunctionActionHandler(
         }
         catch (Exception e)
         {
+            sessionMonitor.ReportPossibleAuthFailure(e);
             logger.LogError(e, "Failed to toggle function {FunctionName} on {FunctionAppName}", function.Name, app.Name);
             function.IsDisabled = !target; // revert on failure
         }

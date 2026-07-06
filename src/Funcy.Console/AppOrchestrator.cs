@@ -3,6 +3,7 @@ using Funcy.Console.Settings;
 using Funcy.Console.Ui;
 using Funcy.Console.Ui.Factory;
 using Funcy.Console.Ui.State;
+using Funcy.Infrastructure.Azure;
 
 namespace Funcy.Console;
 
@@ -17,6 +18,7 @@ public class AppOrchestrator(
     ListPanelContextFactory listPanelContextFactory,
     UiStateMarkupProvider uiStateMarkupProvider,
     AppContext appContext,
+    IAzureSessionMonitor sessionMonitor,
     ITagCatalog tagCatalog,
     IFuncySettingsService settingsService)
 {
@@ -27,7 +29,7 @@ public class AppOrchestrator(
         var cts = new CancellationTokenSource();
 
         _mainContainer = new MainContainer(listPanelContextFactory, actionDispatcher, functionAppUpdateHandler,
-            uiStateMarkupProvider, appContext, tagCatalog, settingsService);
+            uiStateMarkupProvider, appContext, sessionMonitor, tagCatalog, settingsService);
         try
         {
             // InitializeAsync is now done in Program.cs before StartAsync

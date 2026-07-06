@@ -109,6 +109,8 @@ var host = Host.CreateDefaultBuilder(args)
         services.AddTransient<ToolValidationService>();
         services.AddTransient<SplashScreen>();
         services.AddTransient<SubscriptionProbeHandler>();
+        services.AddSingleton<IAzureCliSession, AzureCliSession>();
+        services.AddSingleton<IAzureSessionMonitor, AzureSessionMonitor>();
     })
     .Build();
 
@@ -145,6 +147,13 @@ if (!canContinue)
     return;
 }
 
+// Övervaka az-sessionen i bakgrunden: proaktiv probe + reaktiva rapporter, samt in-app re-login.
+// Startas efter splash så den aldrig fördröjer uppstarten och lever hela appens livstid.
+var sessionMonitor = host.Services.GetRequiredService<IAzureSessionMonitor>();
+sessionMonitor.ReAuthenticatedCallback = () => functionAppUpdateHandler.LoadAllDetailsAsync();
+var sessionCts = new CancellationTokenSource();
+var sessionMonitorTask = sessionMonitor.RunProbeLoopAsync(sessionCts.Token);
+
 // AnimationHandler fortsätter köra för AppOrchestrator
 var mainMenuService = host.Services.GetRequiredService<AppOrchestrator>();
 await mainMenuService.StartAsync();
@@ -152,5 +161,17 @@ await mainMenuService.StartAsync();
 // Stoppa animation efter att huvudmenyn är klar
 await animationCts.CancelAsync();
 await animationTask;
+
+// Stoppa sessionsövervakningen och avbryt ev. pågående re-login rent.
+await sessionCts.CancelAsync();
+(sessionMonitor as IDisposable)?.Dispose();
+try
+{
+    await sessionMonitorTask;
+}
+catch (OperationCanceledException)
+{
+    // Förväntat vid nedstängning.
+}
 
 await host.RunAsync();

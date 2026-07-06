@@ -1,4 +1,5 @@
 using Funcy.Core.Model;
+using Funcy.Infrastructure.Azure;
 using Spectre.Console;
 
 namespace Funcy.Console.Ui;
@@ -6,16 +7,18 @@ namespace Funcy.Console.Ui;
 public static class UiStyles
 {
     private static readonly bool Unicode = AnsiConsole.Profile.Capabilities.Unicode;
-    
+
     public const string Label = "bold yellow";
     public const string Shortcut = "bold purple_2";
     public const string Danger = "bold red";
     public const string Hint = "gray";
     public const string Sort = "yellow";
+    public const string Warning = "bold orange1";
     public const string Bypass = "grey";
 
     private static readonly string ArrowUp = Unicode ? "↑" : "^";
     private static readonly string ArrowDown = Unicode ? "↓" : "v";
+    private static readonly string WarnGlyph = Unicode ? "⚠" : "!";
     public static readonly string PinGlyph = Unicode ? "★" : "*";
 
     // Marks a row kept visible by the operation-status bypass rather than a filter match.
@@ -71,6 +74,36 @@ public static class UiStyles
     public static Markup CreateStatusCell(FunctionStatus status)
     {
         return new Markup($"[bold {UiHelper.GetStatusColor(status)}]{status.ToDisplayLabel()}[/]");
+    }
+
+    /// <summary>
+    /// Danger/warning banner shown in the TopPanel status line when the Azure session is not
+    /// healthy. Returns null when Healthy so the caller keeps the normal status text.
+    /// </summary>
+    public static Markup? CreateSessionBanner(AzureSessionState state)
+    {
+        var markup = CreateSessionBannerMarkup(state);
+        return markup is null ? null : new Markup(markup);
+    }
+
+    /// <summary>Raw banner markup string (pure, testable); null when the session is Healthy.</summary>
+    public static string? CreateSessionBannerMarkup(AzureSessionState state)
+    {
+        switch (state.Status)
+        {
+            case AzureSessionStatus.Expired:
+                var note = string.IsNullOrEmpty(state.FailureNote) ? "" : $" ({state.FailureNote})";
+                return $"[{Danger}]{WarnGlyph} Azure session expired - press L to re-login{note}[/]";
+
+            case AzureSessionStatus.ReAuthenticating when state.DeviceCode is not null:
+                return $"[{Warning}]Azure re-login: open {state.DeviceCodeUrl} and enter code {state.DeviceCode}[/]";
+
+            case AzureSessionStatus.ReAuthenticating:
+                return $"[{Warning}]Azure re-login: starting device-code sign-in...[/]";
+
+            default:
+                return null;
+        }
     }
 
     public static string? CreateFunctionsEmptyStateText(FunctionAppDetails app, UiStatusSnapshot uiStatus)

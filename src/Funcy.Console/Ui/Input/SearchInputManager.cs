@@ -63,15 +63,17 @@ public class SearchInputManager
 
         if (!_searchMode)
         {
-            markupText += " " + UiStyles.CreateDangerText("del");
+            // Escape the raw user input so markup metacharacters (e.g. '[') render literally
+            // instead of being parsed as Spectre markup.
+            markupText = Markup.Escape(markupText) + " " + UiStyles.CreateDangerText("del");
         }
         else
         {
-            markupText = markupText[.._searchIndex]
+            markupText = Markup.Escape(markupText[.._searchIndex])
                          + "[underline]"
-                         + markupText[_searchIndex]
+                         + Markup.Escape(markupText[_searchIndex].ToString())
                          + "[/]"
-                         + markupText[(_searchIndex + 1)..];
+                         + Markup.Escape(markupText[(_searchIndex + 1)..]);
             markupText += " " + UiStyles.CreateDangerText("↩");
         }
 

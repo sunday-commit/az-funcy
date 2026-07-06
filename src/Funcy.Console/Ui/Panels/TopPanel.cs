@@ -138,6 +138,7 @@ public class TopPanel
         _renderedShortcuts.Add(new TableIndex(1, 4), new ShortcutMap(ListPanelShortcuts.ChangeSubscription, true));
         _renderedShortcuts.Add(new TableIndex(1, 5), new ShortcutMap(ListPanelShortcuts.Options, true));
         _renderedShortcuts.Add(new TableIndex(0, 6), new ShortcutMap(ListPanelShortcuts.Pin, true));
+        _renderedShortcuts.Add(new TableIndex(1, 6), new ShortcutMap(ListPanelShortcuts.View, true));
 
         _dataTable.AddRow(UiStyles.CreateLabelMarkup("Subscription:"), new Markup($"{_subscriptionName}"), new Markup(""), new Markup(""), new Markup(""), new Markup(""), new Markup(""));
         _dataTable.AddRow(UiStyles.CreateLabelMarkup("Filter:"), new Markup(""), new Markup(""), new Markup(""), new Markup(""), new Markup(""), new Markup(""));

@@ -194,6 +194,16 @@ public sealed class MainContainer : IDisposable
                 TogglePin();
                 break;
 
+            case var key when
+                key == ListPanelShortcuts.View.Key:
+                AppSettingsView();
+                break;
+
+            case var key when
+                key == ListPanelShortcuts.Mask.Key:
+                ToggleMask();
+                break;
+
             case ConsoleKey.Delete:
                 Current.SearchInputManager.ClearSearchText();
                 SyncSearchUi();
@@ -242,6 +252,24 @@ public sealed class MainContainer : IDisposable
         RefreshMainLayout();
     }
 
+    private void AppSettingsView()
+    {
+        if (!Current.View.IsActionValid(FunctionAction.ViewAppSettings))
+        {
+            return;
+        }
+
+        var selectedKey = Current.View.GetSelectedItemKey();
+        if (string.IsNullOrEmpty(selectedKey))
+        {
+            return;
+        }
+
+        var nextContext = _listPanelContextFactory.CreateAppSettingsPanel(selectedKey, () => _tcs.TrySetResult());
+        _contextStack.Push(nextContext);
+        RefreshMainLayout();
+    }
+
     // Column settings changed: rebuild the root Function Apps panel in place so its columns
     // update live. Fired by IFuncySettingsService.ColumnsChanged during a settings commit, which
     // runs on the input thread (same as HandleInput), so direct stack manipulation is safe. Only
@@ -277,6 +305,19 @@ public sealed class MainContainer : IDisposable
         var nextContext = _listPanelContextFactory.CreateSettingsPanel(() => _tcs.TrySetResult());
         _contextStack.Push(nextContext);
         RefreshMainLayout();
+    }
+
+    private void ToggleMask()
+    {
+        if (!Current.View.IsActionValid(FunctionAction.ToggleMask))
+        {
+            return;
+        }
+
+        if (Current.Controller is IMaskToggleController maskController)
+        {
+            maskController.ToggleSelectedMask();
+        }
     }
 
     private void EnterEditMode(string key, string currentValue)

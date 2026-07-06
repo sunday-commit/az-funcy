@@ -39,7 +39,9 @@ public class ShortcutProviderGridTests
         Assert.Equal(new ShortcutMap(ListPanelShortcuts.Options, true), grid[new TableIndex(1, 5)]);
         // feat/pinned-function-apps: the Pin shortcut (P) was added at (0,6).
         Assert.Equal(new ShortcutMap(ListPanelShortcuts.Pin, true), grid[new TableIndex(0, 6)]);
-        Assert.Equal(9, grid.Count);
+        // feat/app-settings-view: the Env vars shortcut (V) was added to the app panel grid at (1,6).
+        Assert.Equal(new ShortcutMap(ListPanelShortcuts.View, true), grid[new TableIndex(1, 6)]);
+        Assert.Equal(10, grid.Count);
     }
 
     [Fact]

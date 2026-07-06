@@ -97,6 +97,17 @@ public sealed class ListPanelFactory(
         return new InputActionResult(FunctionAction.Swap, app, slotDetails);
     }
 
+    public IListPanel CreateAppSettingsPanel(string appName, Func<UiStatusSnapshot, string?> emptyStateMessage)
+    {
+        return CreateFromList(
+            new AppSettingMatcher(),
+            new AppSettingLayoutRenderer(),
+            new AppSettingShortcutProvider(),
+            null,
+            $"Environment variables [dim grey]({Spectre.Console.Markup.Escape(appName)})[/]",
+            emptyStateMessage: emptyStateMessage);
+    }
+
     public IListPanel CreateSubscriptionPanel()
     {
         var allSubs = appContext.GetSnapshot();

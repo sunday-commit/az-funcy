@@ -337,4 +337,19 @@ public class AzureFunctionService(
 
         return functionApp;
     }
+
+    // Persists the pinned flag by Azure id. Only this column is touched, so a concurrent
+    // inventory sync (which never modifies IsPinned) cannot overwrite it.
+    public async Task SetPinnedAsync(string azureId, bool isPinned)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync();
+        var functionApp = await dbContext.FunctionApps.FirstOrDefaultAsync(f => f.AzureId == azureId);
+        if (functionApp is null)
+        {
+            return;
+        }
+
+        functionApp.IsPinned = isPinned;
+        await dbContext.SaveChangesAsync();
+    }
 }

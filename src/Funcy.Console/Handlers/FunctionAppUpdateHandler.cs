@@ -279,6 +279,33 @@ public class FunctionAppUpdateHandler : IDetailsLoader
         return !snapshot.IsInventoryValidating && !snapshot.IsDetailsRefreshing;
     }
 
+    public async Task TogglePinAsync(string key)
+    {
+        var details = _functionStateCoordinator.TryGet(key);
+        if (details is null)
+        {
+            return;
+        }
+
+        var newValue = !details.IsPinned;
+        try
+        {
+            await _functionService.SetPinnedAsync(details.Id, newValue);
+
+            // Mutate the cached details and republish so the row re-sorts (pinned first) and the
+            // glyph is rebuilt immediately, mirroring how status updates flow through the pipeline.
+            details.IsPinned = newValue;
+            details.LastUpdated = DateTime.UtcNow;
+            await _functionStateCoordinator.PublishUpdateAsync(details);
+        }
+        catch (Exception ex)
+        {
+            // Called fire-and-forget from input handling; a failed pin must not surface as an
+            // unobserved task exception.
+            _logger.LogError(ex, "Failed to toggle pin for {Key}", key);
+        }
+    }
+
     private async Task UpdateFunctionAppList(IAsyncEnumerable<FunctionAppFetchResult> functionAppDetailsToUpdate,
         CancellationToken syncCtsToken)
     {

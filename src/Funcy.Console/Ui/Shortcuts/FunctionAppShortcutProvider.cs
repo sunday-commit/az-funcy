@@ -26,7 +26,8 @@ public class FunctionAppShortcutProvider : IShortcutProvider<FunctionAppDetails>
             {new TableIndex(1, 2), new ShortcutMap(ListPanelShortcuts.Start, CanStart(app))},
             {new TableIndex(1, 3), new ShortcutMap(ListPanelShortcuts.Stop, CanStop(app))},
             {new TableIndex(1, 4), new ShortcutMap(ListPanelShortcuts.ChangeSubscription, true)},
-            {new TableIndex(1, 5), new ShortcutMap(ListPanelShortcuts.Options, true)}
+            {new TableIndex(1, 5), new ShortcutMap(ListPanelShortcuts.Options, true)},
+            {new TableIndex(0, 6), new ShortcutMap(ListPanelShortcuts.Pin, CanPin(app))}
         };
         return shortcutList;
     }
@@ -42,6 +43,7 @@ public class FunctionAppShortcutProvider : IShortcutProvider<FunctionAppDetails>
             FunctionAction.RefreshAll => !_uiStatusState.GetSnapshot().IsInventoryValidating
                                         && !_uiStatusState.GetSnapshot().IsDetailsRefreshing,
             FunctionAction.ChangeSubscription => true,
+            FunctionAction.Pin => CanPin(getSelectedItem),
             _ => false
         };
     }
@@ -57,4 +59,6 @@ public class FunctionAppShortcutProvider : IShortcutProvider<FunctionAppDetails>
 
     private static bool CanRefresh(FunctionAppDetails? app) =>
         app is not null && app.Status.Status != StatusType.InProgress;
+
+    private static bool CanPin(FunctionAppDetails? app) => app is not null;
 }

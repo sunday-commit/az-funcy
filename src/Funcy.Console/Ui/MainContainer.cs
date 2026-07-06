@@ -162,6 +162,11 @@ public sealed class MainContainer : IDisposable
                 ToggleSelectedSubscriptionVisibility();
                 break;
 
+            case var key when
+                key == ListPanelShortcuts.Pin.Key:
+                TogglePin();
+                break;
+
             case ConsoleKey.Delete:
                 Current.SearchInputManager.ClearSearchText();
                 SyncSearchUi();
@@ -310,6 +315,22 @@ public sealed class MainContainer : IDisposable
         _appContext.ToggleSubscriptionVisibility(sub.Id);
         _contextStack.Pop();
         SubscriptionView();
+    }
+
+    private void TogglePin()
+    {
+        if (!Current.View.IsActionValid(FunctionAction.Pin))
+        {
+            return;
+        }
+
+        var selectedKey = Current.View.GetSelectedItemKey();
+        if (string.IsNullOrEmpty(selectedKey))
+        {
+            return;
+        }
+
+        _ = _detailsLoader.TogglePinAsync(selectedKey);
     }
 
     private void LoadDetails()

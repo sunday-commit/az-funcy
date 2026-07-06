@@ -16,6 +16,7 @@ public static class UiStyles
 
     private static readonly string ArrowUp = Unicode ? "↑" : "^";
     private static readonly string ArrowDown = Unicode ? "↓" : "v";
+    public static readonly string PinGlyph = Unicode ? "★" : "*";
 
     // Marks a row kept visible by the operation-status bypass rather than a filter match.
     public static readonly string BypassGlyph = Unicode ? "•" : "*";

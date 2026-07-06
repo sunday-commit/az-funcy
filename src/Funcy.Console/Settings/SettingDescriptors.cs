@@ -16,7 +16,7 @@ public static class SettingDescriptors
         new SettingDescriptor
         {
             Name = "SubscriptionRefreshIntervalMinutes",
-            Description = "Minutes between automatic subscription refreshes (0 = always)",
+            Description = "Minutes between Azure refreshes per subscription (0 = refresh on every switch)",
             Format = s => s.SubscriptionRefreshIntervalMinutes.ToString(),
             Parse = SettingParsers.ParseRefreshInterval
         },

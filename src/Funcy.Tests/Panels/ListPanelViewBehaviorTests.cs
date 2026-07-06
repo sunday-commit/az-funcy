@@ -147,19 +147,21 @@ public class ListPanelViewBehaviorTests
     [Fact]
     public void TryGetNavigationRequest_EmptySelectionWithDelegate_ReturnsFalse()
     {
-        // feat/appinsights-logs intentionally fixed the empty-selection crash: Enter with a
-        // navigation delegate but nothing selected is now a no-op instead of throwing.
+        // With a navigation delegate but no selection, the call is a no-op (returns false)
+        // rather than throwing.
         var view = MakeView([], onEnterNavigation: item => new NavigationRequest(PanelTarget.Functions, item.Key));
         view.RenderIfNeeded();
-        Assert.False(view.TryGetNavigationRequest(out _));
+        Assert.False(view.TryGetNavigationRequest(out var req));
+        Assert.Null(req);
     }
 
     [Fact]
-    public void TryGetActionNavigationRequest_EmptySelectionWithDelegate_Throws()
+    public void TryGetActionNavigationRequest_EmptySelectionWithDelegate_ReturnsFalse()
     {
         var view = MakeView([], onActionNavigation: item => new NavigationRequest(PanelTarget.Slots, item.Key));
         view.RenderIfNeeded();
-        Assert.Throws<ArgumentNullException>(() => view.TryGetActionNavigationRequest(out _));
+        Assert.False(view.TryGetActionNavigationRequest(out var req));
+        Assert.Null(req);
     }
 
     [Fact]

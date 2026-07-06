@@ -20,11 +20,11 @@ public class FunctionStateCoordinatorMergeTests
     };
 
     [Fact]
-    public async Task StateOnlyUpdate_ReplacesFunctionsAndSlots_DoesNotPreserve()
+    public async Task StateOnlyUpdate_PreservesCachedFunctionsAndSlots()
     {
-        // Characterization: only Inventory updates preserve cached functions/slots. A StateOnly
-        // update carries the incoming details verbatim, so cached functions are dropped if the
-        // incoming payload has none.
+        // A StateOnly update carries no detail payload, so it must preserve the cached
+        // functions/slots instead of overwriting them with the incoming empty lists
+        // (same preservation as Inventory updates).
         var coordinator = new FunctionStateCoordinator();
         coordinator.SetSubscription("sub-1");
 
@@ -38,7 +38,7 @@ public class FunctionStateCoordinatorMergeTests
         await coordinator.PublishUpdateAsync(App("appA", "sub-1"), FunctionAppUpdateKind.StateOnly);
         await updated.Task.WaitAsync(Timeout);
 
-        Assert.Empty(coordinator.TryGet("appA")!.Functions);
+        Assert.Equal(["f1"], coordinator.TryGet("appA")!.Functions.Select(f => f.Name));
     }
 
     [Fact]

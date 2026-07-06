@@ -66,6 +66,7 @@ var host = Host.CreateDefaultBuilder(args)
     .ConfigureServices((_, services) =>
     {
         services.Configure<FuncySettings>(config.GetSection("Funcy"));
+        services.AddSingleton<IFuncySettingsService, FuncySettingsService>();
         services.AddMemoryCache();
         services.AddDbContextFactory<FunctionAppDbContext>(options =>
         {

@@ -35,7 +35,9 @@ public class ShortcutProviderGridTests
         Assert.Equal(new ShortcutMap(ListPanelShortcuts.Start, false), grid[new TableIndex(1, 2)]);
         Assert.Equal(new ShortcutMap(ListPanelShortcuts.Stop, true), grid[new TableIndex(1, 3)]);
         Assert.Equal(new ShortcutMap(ListPanelShortcuts.ChangeSubscription, true), grid[new TableIndex(1, 4)]);
-        Assert.Equal(7, grid.Count);
+        // feat/settings-view: the Options shortcut (O) was added to the app panel grid.
+        Assert.Equal(new ShortcutMap(ListPanelShortcuts.Options, true), grid[new TableIndex(1, 5)]);
+        Assert.Equal(8, grid.Count);
     }
 
     [Fact]
@@ -172,12 +174,14 @@ public class ShortcutProviderGridTests
     // ---- FunctionShortcutProvider ----
 
     [Fact]
-    public void Function_Grid_IsFilterOnly()
+    public void Function_Grid_IsFilterAndDisableEnable()
     {
+        // feat/function-disable-toggle: D toggles the selected function's disabled state.
         var sut = new FunctionShortcutProvider();
         var grid = sut.Describe(new FunctionDetails { Name = "fn", FunctionAppName = "appA", Trigger = "t" });
-        Assert.Single(grid);
+        Assert.Equal(2, grid.Count);
         Assert.Equal(new ShortcutMap(ListPanelShortcuts.Filter, true), grid[new TableIndex(0, 2)]);
+        Assert.Equal(new ShortcutMap(ListPanelShortcuts.DisableEnable, true), grid[new TableIndex(0, 3)]);
     }
 
     [Theory]

@@ -247,17 +247,25 @@ public class AzureFunctionService(
                 var config = websiteFunction.Data.Config.ToObjectFromJson<FunctionConfig>(new JsonSerializerOptions
                     { PropertyNameCaseInsensitive = true });
                 var trigger = "";
+                ServiceBusTriggerTarget? serviceBusTarget = null;
                 if (config is not null)
                 {
                     var triggerBinding = config.Bindings.FirstOrDefault(b =>
                         b.Type.EndsWith("Trigger", StringComparison.OrdinalIgnoreCase) &&
                         (b.Direction == null || b.Direction.Equals("in", StringComparison.OrdinalIgnoreCase)));
                     trigger = triggerBinding?.Type ?? "";
+                    serviceBusTarget = ServiceBusBindingReader.TryRead(config);
                 }
 
                 functionList.Add(new Function
                 {
-                    AzureId = websiteFunction.Id.ToString(), Name = websiteFunction.Id.Name, Trigger = Capitalize(trigger),
+                    AzureId = websiteFunction.Id.ToString(),
+                    Name = websiteFunction.Id.Name,
+                    Trigger = Capitalize(trigger),
+                    QueueName = serviceBusTarget?.QueueName,
+                    TopicName = serviceBusTarget?.TopicName,
+                    SubscriptionName = serviceBusTarget?.SubscriptionName,
+                    ConnectionSetting = serviceBusTarget?.ConnectionSetting,
                     IsDisabled = websiteFunction.Data.IsDisabled ?? false
                 });
             }
@@ -336,5 +344,20 @@ public class AzureFunctionService(
             .ToList();
 
         return functionApp;
+    }
+
+    // Persists the pinned flag by Azure id. Only this column is touched, so a concurrent
+    // inventory sync (which never modifies IsPinned) cannot overwrite it.
+    public async Task SetPinnedAsync(string azureId, bool isPinned)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync();
+        var functionApp = await dbContext.FunctionApps.FirstOrDefaultAsync(f => f.AzureId == azureId);
+        if (functionApp is null)
+        {
+            return;
+        }
+
+        functionApp.IsPinned = isPinned;
+        await dbContext.SaveChangesAsync();
     }
 }

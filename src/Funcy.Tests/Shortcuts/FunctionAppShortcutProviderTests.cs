@@ -47,4 +47,21 @@ public class FunctionAppShortcutProviderTests
     [Fact]
     public void Swap_Disabled_WhenOperationInProgress()
         => Assert.False(_sut.IsActionValid(MakeApp(1, StatusType.InProgress), FunctionAction.Swap));
+
+    [Fact]
+    public void Pin_Enabled_WhenAppSelected()
+        => Assert.True(_sut.IsActionValid(MakeApp(0), FunctionAction.Pin));
+
+    [Fact]
+    public void Pin_Disabled_WhenNoAppSelected()
+        => Assert.False(_sut.IsActionValid(null, FunctionAction.Pin));
+
+    [Fact]
+    public void Pin_Enabled_EvenWhenOperationInProgress()
+        => Assert.True(_sut.IsActionValid(MakeApp(0, StatusType.InProgress), FunctionAction.Pin));
+
+    [Fact]
+    public void Describe_IncludesPinShortcut()
+        => Assert.Contains(_sut.Describe(MakeApp(0)).Values,
+            m => m.Shortcut == ListPanelShortcuts.Pin && m.IsEnabled);
 }

@@ -3,6 +3,7 @@ using System;
 using Funcy.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Funcy.Data.Migrations
 {
     [DbContext(typeof(FunctionAppDbContext))]
-    partial class FunctionAppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260706064950_AddFunctionAppIsPinned")]
+    partial class AddFunctionAppIsPinned
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.7");
@@ -27,26 +30,11 @@ namespace Funcy.Data.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("ConnectionSetting")
-                        .HasColumnType("TEXT");
-
                     b.Property<long>("FunctionAppId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<bool>("IsDisabled")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("QueueName")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("SubscriptionName")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("TopicName")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Trigger")

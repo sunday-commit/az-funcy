@@ -293,7 +293,26 @@ public class ListPanelView<T> : IActionHandlingPanel, IListPanelView<T> where T 
     {
         if (string.IsNullOrWhiteSpace(_searchText))
         {
-            return sorted.Select(item => new Candidate(item, false)).ToList();
+            // No filter: still float active-operation rows to the top so a swap/start/stop stays
+            // watchable without having to filter. These are not "bypassed" (Bypassed=false) — they
+            // render with normal cached markup; the dim bypass cue is reserved for rows shown
+            // despite a non-matching filter. Relative order is preserved within each partition.
+            var active = new List<Candidate>();
+            var idle = new List<Candidate>();
+            foreach (var item in sorted)
+            {
+                if (item is IOperationVisibility { HasActiveOperation: true })
+                {
+                    active.Add(new Candidate(item, false));
+                }
+                else
+                {
+                    idle.Add(new Candidate(item, false));
+                }
+            }
+
+            active.AddRange(idle);
+            return active;
         }
 
         var matches = new List<Candidate>();

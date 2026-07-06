@@ -26,6 +26,11 @@ public class ListPanelTableRenderer<T>
                 tableColumn.Width(column.Width);
             }
 
+            if (column.Alignment is { } alignment)
+            {
+                tableColumn.Alignment = alignment;
+            }
+
             Table.AddColumn(tableColumn);
         }
     }

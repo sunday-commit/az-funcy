@@ -157,6 +157,9 @@ public class FunctionStateCoordinator
         
         update.Details.Functions = existing.FunctionAppDetails.Functions;
         update.Details.Slots = existing.FunctionAppDetails.Slots;
+        // Inventory details are mapped from a DB row that may predate an in-session pin toggle;
+        // the cache holds the authoritative pinned flag for this session, so keep it.
+        update.Details.IsPinned = existing.FunctionAppDetails.IsPinned;
 
         return update.Details;
     }

@@ -89,11 +89,12 @@ public class LayoutRendererTests
     // ---- FunctionLayoutRenderer ----
 
     [Fact]
-    public void Function_ColumnLayout_IsNameTriggerAndState()
+    public void Function_ColumnLayout_IsNameTriggerStateAndServiceBusColumns()
     {
         // feat/function-disable-toggle: functions list gained the Enabled/Disabled State column.
+        // feat/servicebus-trigger-insight: functions list gained Listens to / Msgs / DLQ.
         var layout = new FunctionLayoutRenderer().CreateColumnLayout();
-        Assert.Equal(["Name", "Trigger", "State"], layout.Columns.Select(c => c.Header));
+        Assert.Equal(["Name", "Trigger", "State", "Listens to", "Msgs", "DLQ"], layout.Columns.Select(c => c.Header));
     }
 
     [Fact]

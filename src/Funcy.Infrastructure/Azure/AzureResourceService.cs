@@ -74,6 +74,21 @@ public class AzureResourceService : IAzureResourceService
         return results;
     }
     
+    public async Task<string?> GetServiceBusNamespaceIdAsync(string namespaceName)
+    {
+        // Not filtered to the current subscription: the namespace may live in a different one.
+        var query =
+            "Resources | where type =~ 'microsoft.servicebus/namespaces' " +
+            $"| where name =~ '{namespaceName}' " +
+            "| project id, name";
+
+        var graphArgs = BuildGraphArgs(query, 1, null);
+        var json = await ShellCommandRunner.RunAsync("az", graphArgs);
+        var response = JsonSerializer.Deserialize<NamespaceGraphResponse>(json,
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        return response?.Data.FirstOrDefault()?.Id;
+    }
+
     private static string BuildGraphArgs(string query, int first, string? skipToken)
     {
         var sb = new StringBuilder(256);
@@ -103,4 +118,5 @@ public interface IAzureResourceService
     Task<string> GetCurrentSubscriptionId();
     Task<List<FunctionAppGraphRow>> GetAllFunctionApps(string subscriptionId);
     Task<bool> HasAnyFunctionAppsAsync(string subscriptionId);
+    Task<string?> GetServiceBusNamespaceIdAsync(string namespaceName);
 }

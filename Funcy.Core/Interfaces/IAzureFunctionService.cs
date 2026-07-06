@@ -11,4 +11,6 @@ public interface IAzureFunctionService
 
     IAsyncEnumerable<FunctionAppFetchResult> GetFunctionAppFunctionsAndSlotsAsync(
         List<FunctionAppDetails> functionAppDetails, CancellationToken cancellationToken);
+
+    Task SetPinnedAsync(string azureId, bool isPinned);
 }

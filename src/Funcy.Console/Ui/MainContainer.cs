@@ -1,3 +1,4 @@
+using Funcy.Console.Settings;
 using Funcy.Console.Ui.ConsoleHelper;
 using Funcy.Console.Ui.Contexts;
 using Funcy.Console.Ui.Controllers;
@@ -29,6 +30,13 @@ public sealed class MainContainer : IDisposable
     private string? _editError;
     private readonly SettingEditManager _editManager = new();
     private readonly ListPanelContextFactory _listPanelContextFactory;
+    private readonly ITagCatalog _tagCatalog;
+    private readonly IFuncySettingsService _settingsService;
+    // Tag suggestions land here from a background fetch and are applied on the render thread.
+    private IReadOnlyList<string>? _pendingSuggestions;
+
+    // Settings whose columns are baked into the Function Apps panel; a live change rebuilds it.
+    private const string TagColumnsKey = "TagColumns";
 
     private ListPanelContext Current => _contextStack.Peek();
 
@@ -36,13 +44,18 @@ public sealed class MainContainer : IDisposable
         IActionDispatcher actionDispatcher,
         IDetailsLoader detailsLoader,
         UiStateMarkupProvider uiStateMarkupProvider,
-        AppContext appContext)
+        AppContext appContext,
+        ITagCatalog tagCatalog,
+        IFuncySettingsService settingsService)
     {
         _listPanelContextFactory = listPanelContextFactory;
         _actionDispatcher = actionDispatcher;
         _detailsLoader = detailsLoader;
         _uiStateMarkupProvider = uiStateMarkupProvider;
         _appContext = appContext;
+        _tagCatalog = tagCatalog;
+        _settingsService = settingsService;
+        _settingsService.ColumnsChanged += RebuildRootPanel;
         _topPanel = new TopPanel(appContext);
 
         var context = _listPanelContextFactory.CreateRoot(() => _tcs.TrySetResult());
@@ -80,9 +93,23 @@ public sealed class MainContainer : IDisposable
     {
         // Render any pending background model changes here, on the render thread — the only
         // place allowed to touch the Spectre table. Background updates merely flag the view.
+        ApplyPendingEditSuggestions();
         Current.View.RenderIfNeeded();
         UpdateShortcuts();
         UpdateUiStatus();
+    }
+
+    // Applies a completed tag-suggestion fetch on the render thread. Called from HandleUpdate,
+    // which the background fetch wakes via the trigger; this keeps the edit-cell mutation off
+    // the fetch's thread pool thread.
+    private void ApplyPendingEditSuggestions()
+    {
+        var pending = Interlocked.Exchange(ref _pendingSuggestions, null);
+        if (pending is not null && _editMode)
+        {
+            _editManager.SetSuggestions(pending);
+            SyncEditUi();
+        }
     }
 
     private void UpdateUiStatus()
@@ -167,6 +194,11 @@ public sealed class MainContainer : IDisposable
                 ToggleSelectedSubscriptionVisibility();
                 break;
 
+            case var key when
+                key == ListPanelShortcuts.Pin.Key:
+                TogglePin();
+                break;
+
             case ConsoleKey.Delete:
                 Current.SearchInputManager.ClearSearchText();
                 SyncSearchUi();
@@ -215,6 +247,30 @@ public sealed class MainContainer : IDisposable
         RefreshMainLayout();
     }
 
+    // Column settings changed: rebuild the root Function Apps panel in place so its columns
+    // update live. Fired by IFuncySettingsService.ColumnsChanged during a settings commit, which
+    // runs on the input thread (same as HandleInput), so direct stack manipulation is safe. Only
+    // the bottom (root) is swapped; upper panels are preserved. The settings panel sits on top,
+    // so the swap is invisible until the user escapes back to the root.
+    private void RebuildRootPanel()
+    {
+        var upper = new List<ListPanelContext>();
+        while (_contextStack.Count > 1)
+        {
+            upper.Add(_contextStack.Pop());
+        }
+
+        // Dispose the old root controller to unhook its coordinator/UI-status subscriptions
+        // (event-leak rule, PR #20) before replacing it with a freshly-built root.
+        _contextStack.Pop().Controller.Dispose();
+        _contextStack.Push(_listPanelContextFactory.CreateRoot(() => _tcs.TrySetResult()));
+
+        for (var i = upper.Count - 1; i >= 0; i--)
+        {
+            _contextStack.Push(upper[i]);
+        }
+    }
+
     private void SettingsView()
     {
         // Avoid stacking a second settings panel when one is already open.
@@ -234,6 +290,24 @@ public sealed class MainContainer : IDisposable
         _editError = null;
         _editManager.Begin(key, currentValue);
         SyncEditUi();
+
+        if (key == TagColumnsKey)
+        {
+            _ = LoadTagSuggestionsAsync();
+        }
+    }
+
+    private async Task LoadTagSuggestionsAsync()
+    {
+        var keys = await _tagCatalog.GetDistinctTagKeysAsync();
+        if (keys.Count == 0)
+        {
+            return;
+        }
+
+        Interlocked.Exchange(ref _pendingSuggestions, keys);
+        // Wake the render loop so HandleUpdate applies the suggestions on the render thread.
+        _tcs.TrySetResult();
     }
 
     private void HandleEditInput(ConsoleKeyInfo keyInfo)
@@ -317,12 +391,36 @@ public sealed class MainContainer : IDisposable
         SubscriptionView();
     }
 
+    private void TogglePin()
+    {
+        if (!Current.View.IsActionValid(FunctionAction.Pin))
+        {
+            return;
+        }
+
+        var selectedKey = Current.View.GetSelectedItemKey();
+        if (string.IsNullOrEmpty(selectedKey))
+        {
+            return;
+        }
+
+        _ = _detailsLoader.TogglePinAsync(selectedKey);
+    }
+
     private void LoadDetails()
     {
         var currentKey = Current.View.GetSelectedItemKey();
 
         if (Current.View.IsActionValid(FunctionAction.Refresh))
         {
+            // On the Functions panel, Refresh re-runs the controller's Service Bus count fetch
+            // rather than reloading the (already loaded) function app details.
+            if (Current.Controller is ICountRefreshable refreshable)
+            {
+                refreshable.Refresh();
+                return;
+            }
+
             _detailsLoader.LoadDetails(currentKey);
             return;
         }
@@ -426,6 +524,8 @@ public sealed class MainContainer : IDisposable
 
     public void Dispose()
     {
+        _settingsService.ColumnsChanged -= RebuildRootPanel;
+
         foreach (var context in _contextStack)
         {
             context.Controller.Dispose();

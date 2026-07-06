@@ -5,6 +5,8 @@ namespace Funcy.Console.Ui.PanelLayout.Renderers;
 
 public class FunctionLayoutRenderer: ILayoutRenderer<FunctionDetails>
 {
+    private const int ListensToWidth = 28;
+
     public RowMarkup CreateRowMarkup(FunctionDetails item)
     {
         var stateLabel = item.IsDisabled ? "Disabled" : "Enabled";
@@ -14,8 +16,20 @@ public class FunctionLayoutRenderer: ILayoutRenderer<FunctionDetails>
         };
         rowMarkup.Add("Name", new RowCell(UiStyles.CreateSelectedCell(item.Name), new Markup(item.Name)));
         rowMarkup.Add("Trigger", new RowCell(UiStyles.CreateSelectedCell(item.Trigger), new Markup(item.Trigger)));
+
         rowMarkup.Add("State", new RowCell(UiStyles.CreateSelectedCell(stateLabel),
             UiStyles.CreateFunctionStateCell(item.IsDisabled, item.IsToggling)));
+
+        var listensTo = Truncate(item.ListensTo, ListensToWidth);
+        rowMarkup.Add("Listens to", new RowCell(UiStyles.CreateSelectedCell(listensTo), new Markup(Markup.Escape(listensTo))));
+
+        var msgs = CountText(item.ActiveMessages, item.CountStatus);
+        rowMarkup.Add("Msgs", new RowCell(UiStyles.CreateSelectedCell(msgs), new Markup(msgs)));
+
+        var dlq = CountText(item.DeadLetteredMessages, item.CountStatus);
+        var dlqIsDanger = item.CountStatus == ServiceBusCountStatus.Loaded && item.DeadLetteredMessages > 0;
+        var dlqUnselected = dlqIsDanger ? new Markup(UiStyles.CreateDangerText(dlq)) : new Markup(dlq);
+        rowMarkup.Add("DLQ", new RowCell(UiStyles.CreateSelectedCell(dlq), dlqUnselected));
 
         return rowMarkup;
     }
@@ -23,8 +37,29 @@ public class FunctionLayoutRenderer: ILayoutRenderer<FunctionDetails>
     public ColumnLayout<FunctionDetails> CreateColumnLayout()
     {
         return new ColumnLayout<FunctionDetails>(
-            new Column<FunctionDetails>("Name", f => f.Name),
-            new Column<FunctionDetails>("Trigger", f => f.Trigger),
-            new Column<FunctionDetails>("State", f => f.IsDisabled ? "Disabled" : "Enabled", 12));
+            new Column<FunctionDetails>("Name", f => f.Name, 28),
+            new Column<FunctionDetails>("Trigger", f => f.Trigger, 15),
+            new Column<FunctionDetails>("State", f => f.IsDisabled ? "Disabled" : "Enabled", 10),
+            new Column<FunctionDetails>("Listens to", f => f.ListensTo, ListensToWidth),
+            new Column<FunctionDetails>("Msgs", f => f.ActiveMessages, 7, Alignment: Justify.Right),
+            new Column<FunctionDetails>("DLQ", f => f.DeadLetteredMessages, 7, Alignment: Justify.Right));
+    }
+
+    private static string CountText(long? value, ServiceBusCountStatus status) => status switch
+    {
+        ServiceBusCountStatus.Loading => "…",
+        ServiceBusCountStatus.Failed => "?",
+        ServiceBusCountStatus.Loaded => value?.ToString() ?? "?",
+        _ => string.Empty
+    };
+
+    private static string Truncate(string value, int max)
+    {
+        if (value.Length <= max)
+        {
+            return value;
+        }
+
+        return value[..(max - 1)] + "…";
     }
 }

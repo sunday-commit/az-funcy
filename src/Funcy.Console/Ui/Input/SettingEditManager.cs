@@ -89,6 +89,10 @@ public sealed class SettingEditManager
                        + text[(_cursor + 1)..].EscapeMarkup();
         }
 
+        // Prefix a clearly styled label naming the setting so the edit reads as an edit, not the
+        // filter (which shares this TopPanel cell). Value + cursor render as before.
+        rendered = $"[{UiStyles.Label}]Edit {Key.EscapeMarkup()}:[/] " + rendered;
+
         rendered += " " + UiStyles.CreateDangerText("↩");
         if (!string.IsNullOrEmpty(error))
         {

@@ -28,6 +28,26 @@ Alla fyra implementerades av delegerade agenter och granskades därefter manuell
 
 Beslut i omgång 2: **DLQ-åtgärder skippas** (purge/resubmit — destruktivt, låg nytta just nu). **Live Metrics skippas** — det är genuint realtid (~1 s, QuickPulse-streaming) men flyktigt och utan historik, och huvudbehovet är felsökning i efterhand, vilket loggvyn i #28 täcker.
 
+### Omgång 3
+
+| Leverans | Branch | PR |
+|---|---|---|
+| Karakteriseringstestsvit: 243 nya tester som låser mains beteende (283 totalt, ~2 s) | `test/characterization-suite` | [#33](https://github.com/Rudenw/Funcy/pull/33) |
+| Azure session health: proaktiv probe, expired-banner, `L` = device-code-relogin i appen, auto refresh-all | `feat/azure-session-health` | [#34](https://github.com/Rudenw/Funcy/pull/34) |
+
+Testsviten är **inmergad i alla feature-brancher**. Utfall per branch: 6 av 9 hade avvikelser — **samtliga var avsiktliga featureändringar** (nya genvägar i grid:arna, nya kolumner i funktionslistan, den avsiktliga fixen av Enter-kraschen i #28); testerna uppdaterades i respektive branch med dokumenterande commits. Inga oavsiktliga beteendeförändringar hittades. `feat/keep-active-operations-visible`, `feat/error-surfacing` och `feat/azure-session-health` gick igenom helt orörda.
+
+### Misstänkta buggar i main (hittade av testsviten, karakteriserade men inte fixade)
+
+1. `SearchInputManager` escapar inte input — att skriva `[` i sökrutan ger ogiltig Spectre-markup och kastar exception.
+2. `TryGetActionNavigationRequest` kastar på tomt urval (Enter-varianten fixades i #28, action-varianten är kvar men skyddas av `IsActionValid`).
+3. `UiStatusState`: "senaste inventory-refresh"-tidsstämpeln sätts i själva verket av details-refresh, aldrig av inventory-valideringen.
+4. `StateOnly`-uppdateringar i koordinatorn tappar cachade functions/slots (bara `Inventory` bevarar dem).
+5. `ListPanelPaginator.MaxVisibleRows` kan bli negativ i terminaler lägre än 8 rader.
+6. Selektion är indexbaserad — tar man bort vald rad glider nästa rad in under markören.
+
+Säg till vilka av dessa som ska fixas, så blir det små separata PR:ar (1 och 4 är de jag skulle prioritera).
+
 ## Ytterligare features som borde finnas (ej implementerade)
 
 1. **Function detail-vy.** Enter på en funktion går nu till loggvyn; en riktig detaljvy (bindings, senaste körningar, success rate från `requests`) vore nästa steg och kan byggas på samma App Insights-integration.

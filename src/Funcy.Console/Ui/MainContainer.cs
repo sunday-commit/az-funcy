@@ -1,5 +1,6 @@
 using Funcy.Console.Ui.ConsoleHelper;
 using Funcy.Console.Ui.Contexts;
+using Funcy.Console.Ui.Controllers;
 using Funcy.Console.Ui.Factory;
 using Funcy.Console.Ui.Panels;
 using Funcy.Console.Ui.Panels.Interfaces;
@@ -15,8 +16,10 @@ public sealed class MainContainer : IDisposable
     private readonly IActionDispatcher _actionDispatcher;
     private readonly IDetailsLoader _detailsLoader;
     private readonly UiStateMarkupProvider _uiStateMarkupProvider;
+    private readonly IUiErrorLog _errorLog;
     private readonly TopPanel _topPanel;
     private readonly AppContext _appContext;
+    private static readonly Markup EmptyMarkup = new("");
     private TaskCompletionSource _tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     private readonly Stack<ListPanelContext> _contextStack = new();
@@ -31,14 +34,19 @@ public sealed class MainContainer : IDisposable
         IActionDispatcher actionDispatcher,
         IDetailsLoader detailsLoader,
         UiStateMarkupProvider uiStateMarkupProvider,
+        IUiErrorLog errorLog,
         AppContext appContext)
     {
         _listPanelContextFactory = listPanelContextFactory;
         _actionDispatcher = actionDispatcher;
         _detailsLoader = detailsLoader;
         _uiStateMarkupProvider = uiStateMarkupProvider;
+        _errorLog = errorLog;
         _appContext = appContext;
         _topPanel = new TopPanel(appContext);
+
+        // New errors arrive on background threads; wake the render loop so the indicator updates.
+        _errorLog.Changed += OnErrorLogChanged;
 
         var context = _listPanelContextFactory.CreateRoot(() => _tcs.TrySetResult());
         _contextStack.Push(context);
@@ -80,10 +88,13 @@ public sealed class MainContainer : IDisposable
         UpdateUiStatus();
     }
 
+    private void OnErrorLogChanged() => _tcs.TrySetResult();
+
     private void UpdateUiStatus()
     {
         var uiStatusSnapshot = Current.View.GetUiStatusSnapshot();
         _topPanel.SetUiStatusText(_uiStateMarkupProvider.CreateMarkupFromUiStatusState(uiStatusSnapshot));
+        _topPanel.SetErrorIndicator(UiStyles.CreateErrorIndicator(_errorLog.Count) ?? EmptyMarkup);
     }
 
     private void UpdateShortcuts()
@@ -146,6 +157,16 @@ public sealed class MainContainer : IDisposable
                 ToggleSelectedSubscriptionVisibility();
                 break;
 
+            case var key when
+                key == ListPanelShortcuts.Issues.Key:
+                IssuesView();
+                break;
+
+            case var key when
+                key == ListPanelShortcuts.ClearIssues.Key:
+                ClearIssues();
+                break;
+
             case ConsoleKey.Delete:
                 Current.SearchInputManager.ClearSearchText();
                 SyncSearchUi();
@@ -184,6 +205,30 @@ public sealed class MainContainer : IDisposable
         var nextContext = _listPanelContextFactory.CreateSubscriptionPanel(() => _tcs.TrySetResult());
         _contextStack.Push(nextContext);
         RefreshMainLayout();
+    }
+
+    private void IssuesView()
+    {
+        // Avoid stacking duplicate Issues panels if I is pressed while one is already open.
+        if (Current.Controller is UiErrorListController)
+        {
+            return;
+        }
+
+        var nextContext = _listPanelContextFactory.CreateIssuesPanel(() => _tcs.TrySetResult());
+        _contextStack.Push(nextContext);
+        RefreshMainLayout();
+    }
+
+    private void ClearIssues()
+    {
+        // Clear is only meaningful inside the Issues panel.
+        if (Current.Controller is not UiErrorListController)
+        {
+            return;
+        }
+
+        _errorLog.Clear();
     }
 
     private void ToggleSubscriptionFilter()
@@ -319,6 +364,8 @@ public sealed class MainContainer : IDisposable
 
     public void Dispose()
     {
+        _errorLog.Changed -= OnErrorLogChanged;
+
         foreach (var context in _contextStack)
         {
             context.Controller.Dispose();

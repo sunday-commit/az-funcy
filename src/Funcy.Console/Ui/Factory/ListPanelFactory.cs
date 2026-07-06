@@ -76,6 +76,17 @@ public sealed class ListPanelFactory(
         return new InputActionResult(FunctionAction.Swap, app, slotDetails);
     }
 
+    public IListPanel CreateIssuesPanel()
+    {
+        return CreateFromList(
+            new UiErrorMatcher(),
+            new UiErrorLayoutRenderer(),
+            new UiErrorShortcutProvider(),
+            null,
+            "Issues",
+            emptyStateMessage: _ => $"[{UiStyles.Hint}]No errors — all clear[/]");
+    }
+
     public IListPanel CreateSubscriptionPanel()
     {
         var allSubs = appContext.GetSnapshot();

@@ -5,6 +5,7 @@ using Funcy.Console.Ui.Controllers;
 using Funcy.Console.Ui.Navigation;
 using Funcy.Console.Ui.Panels;
 using Funcy.Console.Ui.Panels.Interfaces;
+using Funcy.Console.Ui.State;
 using Funcy.Core.Model;
 
 namespace Funcy.Console.Ui.Factory;
@@ -13,8 +14,22 @@ public sealed class ListPanelContextFactory(
     FunctionStateCoordinator coordinator,
     ListPanelFactory listPanelFactory,
     IUiStatusState uiStatusState,
+    IUiErrorLog errorLog,
     AppContext appContext)
 {
+    public ListPanelContext CreateIssuesPanel(Action invalidate)
+    {
+        var panel = listPanelFactory.CreateIssuesPanel();
+        var view = (IListPanelView<UiErrorEntry>)panel;
+        var controller = new UiErrorListController(view, errorLog, invalidate);
+
+        return new ListPanelContext
+        {
+            View = panel,
+            Controller = controller
+        };
+    }
+
     public ListPanelContext CreateRoot(Action invalidate)
     {
         var panel = listPanelFactory.CreateFunctionAppPanel([]);

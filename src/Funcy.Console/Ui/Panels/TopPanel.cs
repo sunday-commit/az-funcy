@@ -48,7 +48,8 @@ public class TopPanel
         _statusTable.ShowHeaders = false;
         _statusTable.AddColumn("");
         _statusTable.AddColumn("");
-        _statusTable.AddRow(UiStyles.CreateLabelMarkup("Status: "));
+        _statusTable.AddColumn("");
+        _statusTable.AddRow(UiStyles.CreateLabelMarkup("Status: "), new Markup(""), new Markup(""));
     }
 
     private void InitDataTable()
@@ -115,6 +116,11 @@ public class TopPanel
     public void SetUiStatusText(Markup markup)
     {
         _statusTable.Rows.Update(0, 1, markup);
+    }
+
+    public void SetErrorIndicator(Markup markup)
+    {
+        _statusTable.Rows.Update(0, 2, markup);
     }
     
     private void UpdateSearchCell(Markup searchText)

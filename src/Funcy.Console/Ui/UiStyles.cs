@@ -1,3 +1,4 @@
+using Funcy.Console.Ui.Shortcuts;
 using Funcy.Core.Model;
 using Spectre.Console;
 
@@ -15,6 +16,7 @@ public static class UiStyles
     
     private static readonly string ArrowUp = Unicode ? "↑" : "^";
     private static readonly string ArrowDown = Unicode ? "↓" : "v";
+    private static readonly string WarningSign = Unicode ? "⚠" : "!";
 
     public static Markup CreateLabelMarkup(string text) => new($"[{Label}]{text}[/]");
 
@@ -30,6 +32,18 @@ public static class UiStyles
         return $"[bold]{text}[/]{sorting}";
     }
     
+    // Compact top-panel indicator, e.g. "⚠ 3 errors (I)". Null when there is nothing to show.
+    public static Markup? CreateErrorIndicator(int count)
+    {
+        if (count <= 0)
+        {
+            return null;
+        }
+
+        var label = count == 1 ? "error" : "errors";
+        return new Markup($"[{Danger}]{WarningSign} {count} {label}[/] [{Shortcut}]({ListPanelShortcuts.Issues.DisplayChar})[/]");
+    }
+
     public static Markup CreateStatusText(string statusText)
     {
         return new Markup($"[{Color.CornflowerBlue}]{statusText}[/]");

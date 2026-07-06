@@ -298,7 +298,11 @@ public class ListPanelView<T> : IActionHandlingPanel, IListPanelView<T> where T 
         }
 
         var selectedItem = GetSelectedItem();
-        ArgumentNullException.ThrowIfNull(selectedItem);
+        if (selectedItem is null)
+        {
+            return false;
+        }
+
         navigationRequest = _onEnterNavigation(selectedItem);
         return navigationRequest is not null;
     }
@@ -312,7 +316,10 @@ public class ListPanelView<T> : IActionHandlingPanel, IListPanelView<T> where T 
         }
 
         var selectedItem = GetSelectedItem();
-        ArgumentNullException.ThrowIfNull(selectedItem);
+        if (selectedItem is null)
+        {
+            return false;
+        }
 
         navigationRequest = _onActionNavigation(selectedItem);
         return navigationRequest is not null;

@@ -53,7 +53,7 @@ public class FunctionAppLayoutRenderer(IReadOnlyList<string> tagColumns, Func<st
     {
         var columns = new List<Column<FunctionAppDetails>>
         {
-            new("Name", f => f.Name, 40)
+            new("Name", f => f.Name, 40, Flex: true)
         };
 
         foreach (var tag in tagColumns)

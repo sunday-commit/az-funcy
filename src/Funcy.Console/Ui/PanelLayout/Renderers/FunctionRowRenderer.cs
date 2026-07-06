@@ -7,6 +7,18 @@ public class FunctionLayoutRenderer: ILayoutRenderer<FunctionDetails>
 {
     private const int ListensToWidth = 28;
 
+    // Grows with the table (see SetResolvedWidths); starts at the configured minimum so the
+    // first markup build before any resize still truncates sanely.
+    private int _listensToWidth = ListensToWidth;
+
+    public void SetResolvedWidths(IReadOnlyDictionary<string, int> resolvedWidths)
+    {
+        if (resolvedWidths.TryGetValue("Listens to", out var width) && width > 0)
+        {
+            _listensToWidth = width;
+        }
+    }
+
     public RowMarkup CreateRowMarkup(FunctionDetails item)
     {
         var stateLabel = item.IsDisabled ? "Disabled" : "Enabled";
@@ -20,7 +32,7 @@ public class FunctionLayoutRenderer: ILayoutRenderer<FunctionDetails>
         rowMarkup.Add("State", new RowCell(UiStyles.CreateSelectedCell(stateLabel),
             UiStyles.CreateFunctionStateCell(item.IsDisabled, item.IsToggling)));
 
-        var listensTo = Truncate(item.ListensTo, ListensToWidth);
+        var listensTo = Truncate(item.ListensTo, _listensToWidth);
         rowMarkup.Add("Listens to", new RowCell(UiStyles.CreateSelectedCell(listensTo), new Markup(Markup.Escape(listensTo))));
 
         var msgs = CountText(item.ActiveMessages, item.CountStatus);
@@ -37,10 +49,10 @@ public class FunctionLayoutRenderer: ILayoutRenderer<FunctionDetails>
     public ColumnLayout<FunctionDetails> CreateColumnLayout()
     {
         return new ColumnLayout<FunctionDetails>(
-            new Column<FunctionDetails>("Name", f => f.Name, 28),
+            new Column<FunctionDetails>("Name", f => f.Name, 28, Flex: true),
             new Column<FunctionDetails>("Trigger", f => f.Trigger, 15),
             new Column<FunctionDetails>("State", f => f.IsDisabled ? "Disabled" : "Enabled", 10),
-            new Column<FunctionDetails>("Listens to", f => f.ListensTo, ListensToWidth),
+            new Column<FunctionDetails>("Listens to", f => f.ListensTo, ListensToWidth, Flex: true),
             new Column<FunctionDetails>("Msgs", f => f.ActiveMessages, 7, Alignment: Justify.Right),
             new Column<FunctionDetails>("DLQ", f => f.DeadLetteredMessages, 7, Alignment: Justify.Right));
     }

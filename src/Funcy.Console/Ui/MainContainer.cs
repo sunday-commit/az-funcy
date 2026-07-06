@@ -503,6 +503,7 @@ public sealed class MainContainer : IDisposable
 
     public void HandleResize()
     {
+        _topPanel.HandleResize();
         Current.View.HandleResize();
     }
 

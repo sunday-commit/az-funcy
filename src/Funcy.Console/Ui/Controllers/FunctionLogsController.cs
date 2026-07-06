@@ -99,6 +99,10 @@ public sealed class FunctionLogsController : ListPanelControllerBase<LogEntryDet
         {
             // Panel popped / disposed.
         }
+        catch (ObjectDisposedException)
+        {
+            // Dispose() raced the loop between cancellation and the next semaphore wait.
+        }
     }
 
     private async Task PollOnceAsync(string resourceId, CancellationToken cancellationToken)

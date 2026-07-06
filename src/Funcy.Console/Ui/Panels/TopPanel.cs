@@ -69,7 +69,8 @@ public class TopPanel
         });
         _dataTable.AddColumn("", column =>
         {
-            column.Width = 15;
+            // Wide enough for the longest shortcut label rendered here, "<D> Disable/Enable".
+            column.Width = 19;
             column.LeftAligned();
         });
         _dataTable.AddColumn("", column =>

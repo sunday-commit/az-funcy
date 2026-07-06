@@ -111,6 +111,31 @@ public class FunctionStateCoordinatorTests
     }
 
     [Fact]
+    public async Task InventoryUpdate_PreservesExistingPinnedFlag()
+    {
+        var coordinator = new FunctionStateCoordinator();
+        coordinator.SetSubscription("sub-1");
+
+        var seeded = MakeApp("appA", "sub-1");
+        seeded.IsPinned = true;
+        coordinator.InitCache([seeded]);
+
+        var updated = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        coordinator.OnFunctionAppUpdated += _ => updated.TrySetResult();
+
+        // A background inventory refresh maps a (possibly stale) DB row with IsPinned=false;
+        // the cached pinned flag is authoritative for the session and must survive the merge.
+        var stale = MakeApp("appA", "sub-1");
+        stale.IsPinned = false;
+        await coordinator.PublishUpdateAsync(stale, FunctionAppUpdateKind.Inventory);
+        await updated.Task.WaitAsync(Timeout);
+
+        var cached = coordinator.TryGet("appA");
+        Assert.NotNull(cached);
+        Assert.True(cached!.IsPinned);
+    }
+
+    [Fact]
     public async Task DetailsUpdate_ReplacesFunctionsAndSlots()
     {
         var coordinator = new FunctionStateCoordinator();

@@ -1,3 +1,4 @@
+using Funcy.Console.Ui.PanelLayout;
 using Funcy.Console.Ui.Shortcuts;
 using Spectre.Console;
 using Funcy.Core.Model;
@@ -7,33 +8,72 @@ namespace Funcy.Console.Ui.Panels;
 
 public class TopPanel
 {
+    // Index of the subscription-name column and the minimum it may shrink to (the historic width).
+    private const int NameColumnIndex = 1;
+    private const int MinNameWidth = 35;
+    // Combined width of every fixed column (label + the shortcut columns); the name column takes
+    // whatever the target table width leaves after these.
+    private const int FixedColumnsWidth = 15 + 15 + 19 + 20 + 18 + 15;
+
     private string _subscriptionName;
     private readonly Table _dataTable = new();
     private readonly Table _statusTable = new();
     private readonly Dictionary<TableIndex, ShortcutMap> _renderedShortcuts = new();
+    private readonly Func<int> _windowWidth;
+    private int _nameWidth = MinNameWidth;
     public Panel Panel { get; }
 
-    public TopPanel(AppContext appContext)
+    public TopPanel(AppContext appContext, Func<int>? windowWidth = null)
     {
+        _windowWidth = windowWidth ?? (() => System.Console.WindowWidth);
         _subscriptionName = appContext.CurrentSubscription.Name;
         InitDataTable();
         InitStatusTable();
-        
+
         var layoutTable = new Table();
         layoutTable.Border(TableBorder.None);
         layoutTable.ShowHeaders = false;
         layoutTable.AddColumn("");
         layoutTable.AddRow(_dataTable);
         layoutTable.AddRow(_statusTable);
-        
-        
+
+
         Panel = new Panel(layoutTable)
         {
-            Width = 139
+            Width = AdaptiveLayout.PanelWidth(AdaptiveLayout.MinTableWidth)
         };
         Panel.BorderColor(Color.Orange1);
 
+        // Size to the terminal before the first render so the subscription name is not squeezed.
+        ApplyAdaptiveWidth();
+
         appContext.OnSubscriptionChange += OnSubscriptionChanged;
+    }
+
+    // Grows the subscription-name column into the width the terminal actually offers, keeping the
+    // shortcut grid fixed. The panel total tracks the list panel so the two stay aligned; the
+    // shortcut columns keep it from ever narrowing below its natural minimum. Render-thread only.
+    public void HandleResize() => ApplyAdaptiveWidth();
+
+    // Subscription-name column width for a given console width: the adaptive table width minus the
+    // fixed shortcut/label columns, never below the historic minimum. Pure so it can be unit-tested
+    // without a live AppContext.
+    public static int ResolveNameWidth(int consoleWidth)
+        => Math.Max(MinNameWidth, AdaptiveLayout.ResolveTableWidth(consoleWidth) - FixedColumnsWidth);
+
+    private void ApplyAdaptiveWidth()
+    {
+        var consoleWidth = _windowWidth();
+        var nameWidth = ResolveNameWidth(consoleWidth);
+        if (nameWidth != _nameWidth)
+        {
+            _nameWidth = nameWidth;
+            _dataTable.Columns[NameColumnIndex].Width(nameWidth);
+        }
+
+        // The name column may floor above the target, so the panel follows the wider of the two.
+        var target = AdaptiveLayout.ResolveTableWidth(consoleWidth);
+        Panel.Width = AdaptiveLayout.PanelWidth(Math.Max(target, FixedColumnsWidth + nameWidth));
     }
 
     private void OnSubscriptionChanged(SubscriptionDetails obj)
@@ -98,6 +138,7 @@ public class TopPanel
         _renderedShortcuts.Add(new TableIndex(1, 4), new ShortcutMap(ListPanelShortcuts.ChangeSubscription, true));
         _renderedShortcuts.Add(new TableIndex(1, 5), new ShortcutMap(ListPanelShortcuts.Options, true));
         _renderedShortcuts.Add(new TableIndex(0, 6), new ShortcutMap(ListPanelShortcuts.Pin, true));
+        _renderedShortcuts.Add(new TableIndex(1, 6), new ShortcutMap(ListPanelShortcuts.View, true));
 
         _dataTable.AddRow(UiStyles.CreateLabelMarkup("Subscription:"), new Markup($"{_subscriptionName}"), new Markup(""), new Markup(""), new Markup(""), new Markup(""), new Markup(""));
         _dataTable.AddRow(UiStyles.CreateLabelMarkup("Filter:"), new Markup(""), new Markup(""), new Markup(""), new Markup(""), new Markup(""), new Markup(""));

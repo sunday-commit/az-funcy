@@ -33,6 +33,13 @@ public static class SettingDescriptors
             Description = "Per-tag widths as key=value, comma-separated",
             Format = s => string.Join(", ", s.TagColumnWidths.Select(kv => $"{kv.Key}={kv.Value}")),
             Parse = SettingParsers.ParseTagColumnWidths
+        },
+        new SettingDescriptor
+        {
+            Name = "ShowServiceBusInAppList",
+            Description = "Show Service Bus message counts in the app list",
+            Format = s => s.ShowServiceBusInAppList ? "true" : "false",
+            Parse = SettingParsers.ParseShowServiceBusInAppList
         }
     ];
 

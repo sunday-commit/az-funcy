@@ -8,7 +8,8 @@ public interface IFuncySettingsService
     FuncySettings Current { get; }
 
     // Raised by UpdateAsync when a commit changes any column-shaping setting (TagColumns,
-    // DefaultTagColumnWidth, TagColumnWidths) so open panels can rebuild their columns live.
+    // DefaultTagColumnWidth, TagColumnWidths, ShowServiceBusInAppList) so open panels can rebuild
+    // their columns live.
     event Action? ColumnsChanged;
 
     Task UpdateAsync(Action<FuncySettings> mutate);

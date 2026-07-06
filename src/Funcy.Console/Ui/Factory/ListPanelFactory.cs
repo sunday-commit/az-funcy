@@ -60,7 +60,8 @@ public sealed class ListPanelFactory(
         return CreateFromList(
             new FunctionAppMatcher(settings.TagColumns),
             new FunctionAppLayoutRenderer(settings.TagColumns, tag =>
-                settings.TagColumnWidths.TryGetValue(tag, out var w) ? w : settings.DefaultTagColumnWidth),
+                settings.TagColumnWidths.TryGetValue(tag, out var w) ? w : settings.DefaultTagColumnWidth,
+                settings.ShowServiceBusInAppList),
             new FunctionAppShortcutProvider(uiStatusState),
             f => new NavigationRequest(PanelTarget.Functions, f.Key),
             "Azure Function Apps",
@@ -94,6 +95,17 @@ public sealed class ListPanelFactory(
         
         var slotDetails = app.Slots[0];
         return new InputActionResult(FunctionAction.Swap, app, slotDetails);
+    }
+
+    public IListPanel CreateAppSettingsPanel(string appName, Func<UiStatusSnapshot, string?> emptyStateMessage)
+    {
+        return CreateFromList(
+            new AppSettingMatcher(),
+            new AppSettingLayoutRenderer(),
+            new AppSettingShortcutProvider(),
+            null,
+            $"Environment variables [dim grey]({Spectre.Console.Markup.Escape(appName)})[/]",
+            emptyStateMessage: emptyStateMessage);
     }
 
     public IListPanel CreateSubscriptionPanel()

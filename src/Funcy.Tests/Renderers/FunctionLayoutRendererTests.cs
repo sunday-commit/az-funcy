@@ -1,5 +1,6 @@
 using Funcy.Console.Ui.PanelLayout.Renderers;
 using Funcy.Core.Model;
+using Funcy.Tests.TestSupport;
 using Xunit;
 
 namespace Funcy.Tests.Renderers;
@@ -7,6 +8,48 @@ namespace Funcy.Tests.Renderers;
 public class FunctionLayoutRendererTests
 {
     private readonly FunctionLayoutRenderer _sut = new();
+
+    private static FunctionDetails LongListener() => new()
+    {
+        FunctionAppName = "app",
+        Name = "fn",
+        Trigger = "ServiceBusTrigger",
+        QueueName = new string('q', 60)
+    };
+
+    [Fact]
+    public void ListensTo_IsTruncatedToConfiguredWidth_BeforeAnyResize()
+    {
+        // Default (no SetResolvedWidths call) truncates at the configured minimum of 28.
+        var listensTo = MarkupText.Plain(_sut.CreateRowMarkup(LongListener()).GetCell("Listens to", false));
+
+        Assert.Equal(28, listensTo.Length);
+        Assert.EndsWith("…", listensTo);
+    }
+
+    [Fact]
+    public void ListensTo_TruncatesAtResolvedWidth_AfterFlexWidens()
+    {
+        _sut.SetResolvedWidths(new Dictionary<string, int> { ["Listens to"] = 50 });
+
+        var listensTo = MarkupText.Plain(_sut.CreateRowMarkup(LongListener()).GetCell("Listens to", false));
+
+        // The flexed column now shows 50 chars instead of the cramped 28.
+        Assert.Equal(50, listensTo.Length);
+        Assert.EndsWith("…", listensTo);
+    }
+
+    [Fact]
+    public void ColumnLayout_FlexesNameAndListensTo_Only()
+    {
+        var columns = _sut.CreateColumnLayout().Columns;
+
+        Assert.True(columns.Single(c => c.Header == "Name").Flex);
+        Assert.True(columns.Single(c => c.Header == "Listens to").Flex);
+        Assert.False(columns.Single(c => c.Header == "Trigger").Flex);
+        Assert.False(columns.Single(c => c.Header == "Msgs").Flex);
+        Assert.False(columns.Single(c => c.Header == "DLQ").Flex);
+    }
 
     private static FunctionDetails MakeFunction(bool isDisabled) =>
         new() { Name = "ProcessPayment", FunctionAppName = "appA", Trigger = "HttpTrigger", IsDisabled = isDisabled };

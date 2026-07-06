@@ -78,6 +78,25 @@ public class ServiceBusConnectionResolverTests
         Assert.Equal("plain-queue", resolver.ResolveValue("plain-queue"));
     }
 
+    [Fact]
+    public void ResolveValue_PercentPlaceholder_MissingSetting_LeftRaw()
+    {
+        var resolver = Resolver(("SomethingElse", "value"));
+
+        Assert.Equal("%QueueSetting%", resolver.ResolveValue("%QueueSetting%"));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("%%")]
+    public void ResolveValue_EmptyWhitespaceOrBarePercents_ReturnedUnchanged(string value)
+    {
+        var resolver = Resolver(("QueueSetting", "real-queue"));
+
+        Assert.Equal(value, resolver.ResolveValue(value));
+    }
+
     [Theory]
     [InlineData("myns.servicebus.windows.net", "myns")]
     [InlineData("Endpoint=sb://other.servicebus.windows.net/;SharedAccessKeyName=k", "other")]

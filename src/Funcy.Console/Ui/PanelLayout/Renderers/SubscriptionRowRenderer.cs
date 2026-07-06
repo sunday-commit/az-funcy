@@ -21,6 +21,6 @@ public class SubscriptionLayoutRenderer: ILayoutRenderer<SubscriptionDetails>
 
     public ColumnLayout<SubscriptionDetails> CreateColumnLayout()
     {
-        return new ColumnLayout<SubscriptionDetails>(new Column<SubscriptionDetails>("Name", (f) => f.Name));
+        return new ColumnLayout<SubscriptionDetails>(new Column<SubscriptionDetails>("Name", (f) => f.Name, Flex: true));
     }
 }

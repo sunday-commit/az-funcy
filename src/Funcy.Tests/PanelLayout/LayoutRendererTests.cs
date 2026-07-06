@@ -86,6 +86,90 @@ public class LayoutRendererTests
         Assert.Equal("appA", MarkupText.Plain(row.GetCell("Name", true)));
     }
 
+    [Fact]
+    public void FunctionApp_ColumnLayout_ServiceBusOff_HasNoCountColumns()
+    {
+        var renderer = new FunctionAppLayoutRenderer([], _ => 25, showServiceBusCounts: false);
+        var layout = renderer.CreateColumnLayout();
+
+        Assert.DoesNotContain("Msgs", layout.Columns.Select(c => c.Header));
+        Assert.DoesNotContain("DLQ", layout.Columns.Select(c => c.Header));
+    }
+
+    [Fact]
+    public void FunctionApp_ColumnLayout_ServiceBusOn_AddsRightAlignedCountColumns()
+    {
+        var renderer = new FunctionAppLayoutRenderer([], _ => 25, showServiceBusCounts: true);
+        var layout = renderer.CreateColumnLayout();
+
+        Assert.Equal(["Name", "State", "Status", "Msgs", "DLQ", ""], layout.Columns.Select(c => c.Header));
+        var msgs = layout.Columns.Single(c => c.Header == "Msgs");
+        var dlq = layout.Columns.Single(c => c.Header == "DLQ");
+        Assert.Equal(7, msgs.Width);
+        Assert.Equal(7, dlq.Width);
+        Assert.Equal(Spectre.Console.Justify.Right, msgs.Alignment);
+        Assert.Equal(Spectre.Console.Justify.Right, dlq.Alignment);
+        // Name column is shrunk by the two count widths to protect the fixed table budget.
+        Assert.Equal(40 - 14, layout.Columns[0].Width);
+    }
+
+    [Fact]
+    public void FunctionApp_RowMarkup_ServiceBusOn_EmptyWhenCountsNotAllLoaded()
+    {
+        var app = App();
+        app.Functions =
+        [
+            Sb("loaded", 4, 1, ServiceBusCountStatus.Loaded),
+            Sb("loading", null, null, ServiceBusCountStatus.Loading)
+        ];
+        var renderer = new FunctionAppLayoutRenderer([], _ => 25, showServiceBusCounts: true);
+
+        var row = renderer.CreateRowMarkup(app);
+
+        Assert.Equal("", MarkupText.Plain(row.GetCell("Msgs", false)));
+        Assert.Equal("", MarkupText.Plain(row.GetCell("DLQ", false)));
+    }
+
+    [Fact]
+    public void FunctionApp_RowMarkup_ServiceBusOn_ShowsSummedCountsWhenLoaded()
+    {
+        var app = App();
+        app.Functions =
+        [
+            Sb("one", 4, 1, ServiceBusCountStatus.Loaded),
+            Sb("two", 10, 2, ServiceBusCountStatus.Loaded)
+        ];
+        var renderer = new FunctionAppLayoutRenderer([], _ => 25, showServiceBusCounts: true);
+
+        var row = renderer.CreateRowMarkup(app);
+
+        Assert.Equal("14", MarkupText.Plain(row.GetCell("Msgs", false)));
+        Assert.Equal("3", MarkupText.Plain(row.GetCell("DLQ", false)));
+    }
+
+    [Fact]
+    public void FunctionApp_RowMarkup_ServiceBusOn_NoServiceBusFunctions_RendersEmpty()
+    {
+        var app = App(); // App() has no functions
+        var renderer = new FunctionAppLayoutRenderer([], _ => 25, showServiceBusCounts: true);
+
+        var row = renderer.CreateRowMarkup(app);
+
+        Assert.Equal("", MarkupText.Plain(row.GetCell("Msgs", false)));
+        Assert.Equal("", MarkupText.Plain(row.GetCell("DLQ", false)));
+    }
+
+    private static FunctionDetails Sb(string name, long? active, long? dlq, ServiceBusCountStatus status) => new()
+    {
+        FunctionAppName = "appA",
+        Name = name,
+        Trigger = "ServiceBusTrigger",
+        QueueName = "q-" + name,
+        ActiveMessages = active,
+        DeadLetteredMessages = dlq,
+        CountStatus = status
+    };
+
     // ---- FunctionLayoutRenderer ----
 
     [Fact]

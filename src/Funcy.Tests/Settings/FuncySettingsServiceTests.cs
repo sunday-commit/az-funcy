@@ -81,6 +81,18 @@ public class FuncySettingsServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task UpdateAsync_FiresColumnsChanged_WhenShowServiceBusInAppListToggles()
+    {
+        var service = MakeService();
+        var fired = 0;
+        service.ColumnsChanged += () => fired++;
+
+        await service.UpdateAsync(s => s.ShowServiceBusInAppList = true);
+
+        Assert.Equal(1, fired);
+    }
+
+    [Fact]
     public async Task UpdateAsync_DoesNotFireColumnsChanged_WhenOnlyIrrelevantSettingChanges()
     {
         var service = MakeService();

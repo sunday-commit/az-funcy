@@ -1,4 +1,5 @@
 using System.Text;
+using Funcy.Console.Settings;
 using Spectre.Console;
 
 namespace Funcy.Console.Ui.Input;
@@ -17,6 +18,7 @@ public sealed class SettingEditManager
 {
     private readonly StringBuilder _text = new();
     private int _cursor;
+    private IReadOnlyList<string> _suggestions = [];
 
     public string Key { get; private set; } = "";
     public string Text => _text.ToString();
@@ -27,7 +29,12 @@ public sealed class SettingEditManager
         _text.Clear();
         _text.Append(initialValue);
         _cursor = _text.Length;
+        _suggestions = [];
     }
+
+    // Suggestions are fetched asynchronously after editing begins; when they arrive they show as
+    // an inline hint and enable Tab-completion of the next unused key.
+    public void SetSuggestions(IReadOnlyList<string> suggestions) => _suggestions = suggestions;
 
     public EditInputResult HandleInput(ConsoleKeyInfo keyInfo)
     {
@@ -62,6 +69,9 @@ public sealed class SettingEditManager
             case ConsoleKey.End:
                 _cursor = _text.Length;
                 break;
+            case ConsoleKey.Tab:
+                TryCompleteFromSuggestions();
+                break;
             default:
                 if (!char.IsControl(keyInfo.KeyChar))
                 {
@@ -72,6 +82,37 @@ public sealed class SettingEditManager
         }
 
         return EditInputResult.Continue;
+    }
+
+    // Appends the first suggested key not already present in the comma-separated value.
+    private void TryCompleteFromSuggestions()
+    {
+        if (_suggestions.Count == 0)
+        {
+            return;
+        }
+
+        var current = _text.ToString();
+        var present = current
+            .Split(',')
+            .Select(part => part.Trim())
+            .Where(part => part.Length > 0)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var next = _suggestions.FirstOrDefault(s => !present.Contains(s));
+        if (next is null)
+        {
+            return;
+        }
+
+        var trimmed = current.TrimEnd();
+        var completed = trimmed.Length == 0 ? next
+            : trimmed.EndsWith(',') ? $"{trimmed} {next}"
+            : $"{trimmed}, {next}";
+
+        _text.Clear();
+        _text.Append(completed);
+        _cursor = _text.Length;
     }
 
     public Markup GetMarkup(string? error)
@@ -92,6 +133,16 @@ public sealed class SettingEditManager
         // Prefix a clearly styled label naming the setting so the edit reads as an edit, not the
         // filter (which shares this TopPanel cell). Value + cursor render as before.
         rendered = $"[{UiStyles.Label}]Edit {Key.EscapeMarkup()}:[/] " + rendered;
+
+        // Surface the available tag keys (once fetched) so the user knows what to type / Tab to.
+        if (_suggestions.Count > 0)
+        {
+            var hint = TagColumnSuggestions.FormatHint(_suggestions);
+            if (hint.Length > 0)
+            {
+                rendered += $"  [{UiStyles.Hint}]{hint.EscapeMarkup()}[/]";
+            }
+        }
 
         rendered += " " + UiStyles.CreateDangerText("↩");
         if (!string.IsNullOrEmpty(error))

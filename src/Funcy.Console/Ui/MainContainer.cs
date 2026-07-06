@@ -1,3 +1,4 @@
+using Funcy.Console.Settings;
 using Funcy.Console.Ui.ConsoleHelper;
 using Funcy.Console.Ui.Contexts;
 using Funcy.Console.Ui.Controllers;
@@ -29,6 +30,12 @@ public sealed class MainContainer : IDisposable
     private string? _editError;
     private readonly SettingEditManager _editManager = new();
     private readonly ListPanelContextFactory _listPanelContextFactory;
+    private readonly ITagCatalog _tagCatalog;
+    // Tag suggestions land here from a background fetch and are applied on the render thread.
+    private IReadOnlyList<string>? _pendingSuggestions;
+
+    // Settings whose columns are baked into the Function Apps panel; a live change rebuilds it.
+    private const string TagColumnsKey = "TagColumns";
 
     private ListPanelContext Current => _contextStack.Peek();
 
@@ -36,13 +43,15 @@ public sealed class MainContainer : IDisposable
         IActionDispatcher actionDispatcher,
         IDetailsLoader detailsLoader,
         UiStateMarkupProvider uiStateMarkupProvider,
-        AppContext appContext)
+        AppContext appContext,
+        ITagCatalog tagCatalog)
     {
         _listPanelContextFactory = listPanelContextFactory;
         _actionDispatcher = actionDispatcher;
         _detailsLoader = detailsLoader;
         _uiStateMarkupProvider = uiStateMarkupProvider;
         _appContext = appContext;
+        _tagCatalog = tagCatalog;
         _topPanel = new TopPanel(appContext);
 
         var context = _listPanelContextFactory.CreateRoot(() => _tcs.TrySetResult());
@@ -80,9 +89,23 @@ public sealed class MainContainer : IDisposable
     {
         // Render any pending background model changes here, on the render thread — the only
         // place allowed to touch the Spectre table. Background updates merely flag the view.
+        ApplyPendingEditSuggestions();
         Current.View.RenderIfNeeded();
         UpdateShortcuts();
         UpdateUiStatus();
+    }
+
+    // Applies a completed tag-suggestion fetch on the render thread. Called from HandleUpdate,
+    // which the background fetch wakes via the trigger; this keeps the edit-cell mutation off
+    // the fetch's thread pool thread.
+    private void ApplyPendingEditSuggestions()
+    {
+        var pending = Interlocked.Exchange(ref _pendingSuggestions, null);
+        if (pending is not null && _editMode)
+        {
+            _editManager.SetSuggestions(pending);
+            SyncEditUi();
+        }
     }
 
     private void UpdateUiStatus()
@@ -229,6 +252,24 @@ public sealed class MainContainer : IDisposable
         _editError = null;
         _editManager.Begin(key, currentValue);
         SyncEditUi();
+
+        if (key == TagColumnsKey)
+        {
+            _ = LoadTagSuggestionsAsync();
+        }
+    }
+
+    private async Task LoadTagSuggestionsAsync()
+    {
+        var keys = await _tagCatalog.GetDistinctTagKeysAsync();
+        if (keys.Count == 0)
+        {
+            return;
+        }
+
+        Interlocked.Exchange(ref _pendingSuggestions, keys);
+        // Wake the render loop so HandleUpdate applies the suggestions on the render thread.
+        _tcs.TrySetResult();
     }
 
     private void HandleEditInput(ConsoleKeyInfo keyInfo)

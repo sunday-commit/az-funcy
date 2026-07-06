@@ -24,6 +24,6 @@ public class SettingLayoutRenderer : ILayoutRenderer<SettingItemDetails>
         return new ColumnLayout<SettingItemDetails>(
             new Column<SettingItemDetails>("Setting", i => i.Name, 34),
             new Column<SettingItemDetails>("Value", i => i.Value, 30),
-            new Column<SettingItemDetails>("Description", i => i.Description));
+            new Column<SettingItemDetails>("Description", i => i.Description, Flex: true));
     }
 }

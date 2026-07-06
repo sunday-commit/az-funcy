@@ -88,7 +88,7 @@ public class FunctionAppLayoutRenderer(
     {
         var columns = new List<Column<FunctionAppDetails>>
         {
-            new("Name", f => f.Name, NameColumnWidth)
+            new("Name", f => f.Name, 40, Flex: true)
         };
 
         foreach (var tag in tagColumns)

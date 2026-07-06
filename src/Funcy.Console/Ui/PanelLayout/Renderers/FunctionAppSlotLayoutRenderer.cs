@@ -19,7 +19,7 @@ public class FunctionAppSlotLayoutRenderer: ILayoutRenderer<FunctionAppSlotDetai
 
     public ColumnLayout<FunctionAppSlotDetails> CreateColumnLayout()
     {
-        return new ColumnLayout<FunctionAppSlotDetails>(new Column<FunctionAppSlotDetails>("Name", s => s.Name),
-            new Column<FunctionAppSlotDetails>("State", s => s.State));
+        return new ColumnLayout<FunctionAppSlotDetails>(new Column<FunctionAppSlotDetails>("Name", s => s.Name, Flex: true),
+            new Column<FunctionAppSlotDetails>("State", s => s.State, 10));
     }
 }

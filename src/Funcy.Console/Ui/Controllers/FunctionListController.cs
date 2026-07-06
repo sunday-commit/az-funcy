@@ -117,6 +117,11 @@ public sealed class FunctionListController : ListPanelControllerBase<FunctionDet
 
                     function.ActiveMessages = result.ActiveMessages;
                     function.DeadLetteredMessages = result.DeadLetteredMessages;
+                    // Publish the resolved %SettingName% binding names so "Listens to" shows the real
+                    // target. This is a per-runtime display value; the raw names remain in SQLite.
+                    function.QueueName = result.QueueName;
+                    function.TopicName = result.TopicName;
+                    function.SubscriptionName = result.SubscriptionName;
                     function.CountStatus = result.Success
                         ? ServiceBusCountStatus.Loaded
                         : ServiceBusCountStatus.Failed;

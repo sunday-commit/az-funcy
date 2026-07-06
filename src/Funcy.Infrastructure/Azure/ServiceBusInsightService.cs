@@ -57,19 +57,23 @@ public class ServiceBusInsightService(
         ServiceBusConnectionResolver? resolver,
         CancellationToken cancellationToken)
     {
+        // Resolve %SettingName% binding names first so they feed both the ARM lookup and the
+        // display, regardless of whether the count fetch below succeeds.
+        var (queueName, topicName, subscriptionName) = ResolveBindingNames(resolver, function);
+        LogUnresolved(function.QueueName, queueName);
+        LogUnresolved(function.TopicName, topicName);
+        LogUnresolved(function.SubscriptionName, subscriptionName);
+
         try
         {
             var namespaceId = await ResolveNamespaceIdAsync(functionAppArmId, function.ConnectionSetting, resolver);
             if (namespaceId is null)
             {
                 logger.LogWarning("Could not resolve Service Bus namespace for function {Function}", function.Key);
-                return Failed(function);
+                return Failed(function, queueName, topicName, subscriptionName);
             }
 
             var nsId = new ResourceIdentifier(namespaceId);
-            var queueName = Resolve(resolver, function.QueueName);
-            var topicName = Resolve(resolver, function.TopicName);
-            var subscriptionName = Resolve(resolver, function.SubscriptionName);
 
             if (!string.IsNullOrEmpty(topicName) && !string.IsNullOrEmpty(subscriptionName))
             {
@@ -79,7 +83,8 @@ public class ServiceBusInsightService(
                 return new ServiceBusCountResult(function.Key,
                     data.CountDetails?.ActiveMessageCount ?? 0,
                     data.CountDetails?.DeadLetterMessageCount ?? 0,
-                    true);
+                    true,
+                    queueName, topicName, subscriptionName);
             }
 
             if (!string.IsNullOrEmpty(queueName))
@@ -90,10 +95,11 @@ public class ServiceBusInsightService(
                 return new ServiceBusCountResult(function.Key,
                     data.CountDetails?.ActiveMessageCount ?? 0,
                     data.CountDetails?.DeadLetterMessageCount ?? 0,
-                    true);
+                    true,
+                    queueName, topicName, subscriptionName);
             }
 
-            return Failed(function);
+            return Failed(function, queueName, topicName, subscriptionName);
         }
         catch (OperationCanceledException)
         {
@@ -102,7 +108,7 @@ public class ServiceBusInsightService(
         catch (Exception e)
         {
             logger.LogError(e, "Failed to fetch Service Bus counts for function {Function}", function.Key);
-            return Failed(function);
+            return Failed(function, queueName, topicName, subscriptionName);
         }
     }
 
@@ -150,13 +156,35 @@ public class ServiceBusInsightService(
         }
     }
 
+    // Resolves a function's %SettingName% binding names against the app settings the resolver wraps.
+    // Names with no matching setting (or when no resolver is available) are returned raw.
+    public static (string? QueueName, string? TopicName, string? SubscriptionName) ResolveBindingNames(
+        ServiceBusConnectionResolver? resolver, FunctionDetails function)
+        => (Resolve(resolver, function.QueueName),
+            Resolve(resolver, function.TopicName),
+            Resolve(resolver, function.SubscriptionName));
+
     private static string? Resolve(ServiceBusConnectionResolver? resolver, string? value)
         => resolver is null ? value : resolver.ResolveValue(value);
 
-    private static ServiceBusCountResult Failed(FunctionDetails function)
-        => new(function.Key, null, null, false);
+    private void LogUnresolved(string? raw, string? resolved)
+    {
+        if (IsPlaceholder(raw) && HasPlaceholder(resolved))
+        {
+            logger.LogDebug(
+                "Service Bus binding setting {Setting} not found in application settings; leaving name unresolved",
+                raw![1..^1]);
+        }
+    }
+
+    private static ServiceBusCountResult Failed(
+        FunctionDetails function, string? queueName, string? topicName, string? subscriptionName)
+        => new(function.Key, null, null, false, queueName, topicName, subscriptionName);
 
     private static bool HasPlaceholder(string? value) => value?.Contains('%') == true;
+
+    private static bool IsPlaceholder(string? value)
+        => value is { Length: >= 2 } && value[0] == '%' && value[^1] == '%';
 
     private static string CacheKey(string functionAppArmId, string? connectionSetting)
         => $"{functionAppArmId}|{connectionSetting ?? string.Empty}";

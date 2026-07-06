@@ -7,5 +7,6 @@ public enum PanelTarget
     Functions,
     Slots,
     Issues,
+    AppSettings,
     Settings,
 }

@@ -100,6 +100,49 @@ public class SettingParsersTests
         Assert.False(SettingParsers.ParseTagColumnWidths(raw).Success);
     }
 
+    [Theory]
+    [InlineData("true")]
+    [InlineData("TRUE")]
+    [InlineData("yes")]
+    [InlineData("on")]
+    [InlineData("1")]
+    public void ParseShowServiceBusInAppList_TruthyValues_SetTrue(string raw)
+    {
+        var settings = Apply(SettingParsers.ParseShowServiceBusInAppList(raw));
+        Assert.True(settings.ShowServiceBusInAppList);
+    }
+
+    [Theory]
+    [InlineData("false")]
+    [InlineData("False")]
+    [InlineData("no")]
+    [InlineData("off")]
+    [InlineData("0")]
+    public void ParseShowServiceBusInAppList_FalsyValues_SetFalse(string raw)
+    {
+        var settings = Apply(SettingParsers.ParseShowServiceBusInAppList(raw));
+        Assert.False(settings.ShowServiceBusInAppList);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("maybe")]
+    [InlineData("2")]
+    public void ParseShowServiceBusInAppList_Invalid_Fails(string raw)
+    {
+        Assert.False(SettingParsers.ParseShowServiceBusInAppList(raw).Success);
+    }
+
+    [Fact]
+    public void Descriptors_IncludesShowServiceBusInAppList()
+    {
+        var descriptor = SettingDescriptors.Find("ShowServiceBusInAppList");
+
+        Assert.NotNull(descriptor);
+        Assert.Equal("false", descriptor.Format(new FuncySettings()));
+        Assert.Equal("true", descriptor.Format(new FuncySettings { ShowServiceBusInAppList = true }));
+    }
+
     [Fact]
     public void Descriptors_FormatOutput_RoundTripsThroughParse()
     {
@@ -108,7 +151,8 @@ public class SettingParsersTests
             TagColumns = ["System", "Team"],
             SubscriptionRefreshIntervalMinutes = 45,
             DefaultTagColumnWidth = 25,
-            TagColumnWidths = new Dictionary<string, int> { ["System"] = 40 }
+            TagColumnWidths = new Dictionary<string, int> { ["System"] = 40 },
+            ShowServiceBusInAppList = true
         };
 
         foreach (var descriptor in SettingDescriptors.All)

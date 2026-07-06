@@ -11,7 +11,9 @@ public enum FunctionAction
     ChangeSubscription,
     HideSubscription,
     ToggleSubscriptionVisibility,
-    Pin
+    Pin,
+    ViewAppSettings,
+    ToggleMask
 }
 
 public static class FunctionActionExtensions

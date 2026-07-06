@@ -73,6 +73,11 @@ public sealed class FuncySettingsService : IFuncySettingsService
             return true;
         }
 
+        if (a.ShowServiceBusInAppList != b.ShowServiceBusInAppList)
+        {
+            return true;
+        }
+
         if (a.TagColumnWidths.Count != b.TagColumnWidths.Count)
         {
             return true;
@@ -94,6 +99,7 @@ public sealed class FuncySettingsService : IFuncySettingsService
         TagColumns = [.. source.TagColumns],
         SubscriptionRefreshIntervalMinutes = source.SubscriptionRefreshIntervalMinutes,
         DefaultTagColumnWidth = source.DefaultTagColumnWidth,
-        TagColumnWidths = new Dictionary<string, int>(source.TagColumnWidths)
+        TagColumnWidths = new Dictionary<string, int>(source.TagColumnWidths),
+        ShowServiceBusInAppList = source.ShowServiceBusInAppList
     };
 }

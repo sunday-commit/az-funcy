@@ -18,10 +18,13 @@ public sealed class ListPanelContextFactory(
     ListPanelFactory listPanelFactory,
     IUiStatusState uiStatusState,
     IUiErrorLog errorLog,
+    AppContext appContext,
+    IAppSettingsService appSettingsService,
+    IKeyVaultSecretResolver secretResolver,
     IServiceBusInsightService serviceBusInsightService,
     ILogger<FunctionListController> functionListLogger,
     IFuncySettingsService settingsService,
-    AppContext appContext)
+    ILoggerFactory loggerFactory)
 {
     public ListPanelContext CreateIssuesPanel(Action invalidate)
     {
@@ -76,6 +79,32 @@ public sealed class ListPanelContextFactory(
             : allSubs;
         
         var controller = new SnapshotListController<SubscriptionDetails>(view, subsToShow, invalidate);
+        return new ListPanelContext
+        {
+            View = panel,
+            Controller = controller
+        };
+    }
+
+    public ListPanelContext CreateAppSettingsPanel(string appKey, Action invalidate)
+    {
+        var app = coordinator.TryGet(appKey)
+                  ?? throw new InvalidOperationException($"App not found: {appKey}");
+
+        var emptyState = new AppSettingsEmptyState();
+        var panel = listPanelFactory.CreateAppSettingsPanel(app.Name, _ => emptyState.Message);
+        var view = (IListPanelView<AppSettingDetails>)panel;
+
+        var controller = new AppSettingsListController(
+            view,
+            app.Id,
+            app.Name,
+            appSettingsService,
+            secretResolver,
+            emptyState,
+            loggerFactory.CreateLogger<AppSettingsListController>(),
+            invalidate);
+
         return new ListPanelContext
         {
             View = panel,

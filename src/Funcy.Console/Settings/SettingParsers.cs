@@ -79,6 +79,33 @@ public static class SettingParsers
         return SettingParseResult.Ok(s => s.TagColumnWidths = result);
     }
 
+    // Boolean toggle: accepts true/false, yes/no, on/off and 1/0 (case-insensitive).
+    public static SettingParseResult ParseShowServiceBusInAppList(string raw)
+    {
+        if (!TryParseBool(raw, out var value))
+        {
+            return SettingParseResult.Fail("Value must be true or false");
+        }
+
+        return SettingParseResult.Ok(s => s.ShowServiceBusInAppList = value);
+    }
+
+    private static bool TryParseBool(string raw, out bool value)
+    {
+        switch (raw.Trim().ToLowerInvariant())
+        {
+            case "true" or "yes" or "on" or "1":
+                value = true;
+                return true;
+            case "false" or "no" or "off" or "0":
+                value = false;
+                return true;
+            default:
+                value = false;
+                return false;
+        }
+    }
+
     private static bool TryParseWidth(string text, out int value)
     {
         return int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out value)

@@ -45,6 +45,11 @@ public class ListPanelView<T> : IActionHandlingPanel, IListPanelView<T> where T 
 
     private readonly ListPanelPaginator _paginator;
     private readonly ListPanelTableRenderer<T> _renderer;
+    private readonly ColumnLayout<T> _columnLayout;
+    // Console width source, injectable for headless tests exactly like windowHeight.
+    private readonly Func<int> _windowWidth;
+    // Resolved table width currently applied; guards against redundant re-flow/cache clears.
+    private int _tableWidth;
     private string _searchText = "";
     private UiStatusSnapshot _uiStatus;
 
@@ -52,7 +57,7 @@ public class ListPanelView<T> : IActionHandlingPanel, IListPanelView<T> where T 
     public ListPanelView(ISearchMatcher<T> searchMatcher,
         ILayoutRenderer<T> layoutRenderer, IShortcutProvider<T> shortcuts, IAnimationProvider animationProvider, Func<T, NavigationRequest>? onEnterNavigation, string header,
         Func<FunctionAction, T, InputActionResult?>? onAction, Func<T, NavigationRequest>? onActionNavigation,
-        Func<UiStatusSnapshot, string?>? emptyStateMessage = null, Func<int>? windowHeight = null)
+        Func<UiStatusSnapshot, string?>? emptyStateMessage = null, Func<int>? windowHeight = null, Func<int>? windowWidth = null)
 
     {
         _searchMatcher = searchMatcher;
@@ -63,18 +68,59 @@ public class ListPanelView<T> : IActionHandlingPanel, IListPanelView<T> where T 
         _onAction = onAction;
         _onActionNavigation = onActionNavigation;
         _emptyStateMessage = emptyStateMessage;
+        _windowWidth = windowWidth ?? (() => System.Console.WindowWidth);
         _paginator = new ListPanelPaginator(windowHeight);
-        
-        var columnLayout = _layoutRenderer.CreateColumnLayout();
-        _renderer = new ListPanelTableRenderer<T>(columnLayout);
-        _sorter = new ListPanelSorter<T>(columnLayout);
-        
+
+        _columnLayout = _layoutRenderer.CreateColumnLayout();
+        _renderer = new ListPanelTableRenderer<T>(_columnLayout);
+        _sorter = new ListPanelSorter<T>(_columnLayout);
+
         Panel = new Panel(_renderer.Table)
         {
-            Width = 139
+            Width = AdaptiveLayout.PanelWidth(AdaptiveLayout.MinTableWidth)
         }
             .Header(header, Justify.Center)
             .BorderColor(Color.Orange1);
+
+        // Size to the actual terminal before the first render so startup is already adaptive.
+        ApplyAdaptiveWidth();
+    }
+
+    // Resolves the target table width from the console, and — when it changed — re-flows the
+    // table columns, tells the layout renderer the new widths (so cell truncation matches what is
+    // on screen), rebuilds the per-item markup cache at the new widths, and resizes the panel.
+    // Runs on the render thread (ctor or HandleResize), the only place allowed to touch the table.
+    private void ApplyAdaptiveWidth()
+    {
+        var target = AdaptiveLayout.ResolveTableWidth(_windowWidth());
+        if (target == _tableWidth)
+        {
+            return;
+        }
+
+        _tableWidth = target;
+        _renderer.ApplyWidth(target);
+
+        var resolved = _columnLayout.Resolve(target);
+        var byHeader = new Dictionary<string, int>(StringComparer.Ordinal);
+        for (var i = 0; i < _columnLayout.Columns.Count; i++)
+        {
+            byHeader[_columnLayout.Columns[i].Header] = resolved[i];
+        }
+
+        _layoutRenderer.SetResolvedWidths(byHeader);
+
+        lock (_gate)
+        {
+            // Cached markup was truncated at the old width; rebuild it so flex columns re-expand.
+            _markupCache.Clear();
+            foreach (var (key, item) in _items)
+            {
+                _markupCache[key] = _layoutRenderer.CreateRowMarkup(item);
+            }
+        }
+
+        Panel.Width = AdaptiveLayout.PanelWidth(target);
     }
     
     // SetAll/Upsert/Remove/SetUiStatus are invoked from background (controller) threads. They
@@ -136,6 +182,7 @@ public class ListPanelView<T> : IActionHandlingPanel, IListPanelView<T> where T 
 
     public void HandleResize()
     {
+        ApplyAdaptiveWidth();
         _paginator.UpdateMaxVisibleRows();
         RefreshView();
     }

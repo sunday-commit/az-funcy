@@ -59,6 +59,39 @@ public class FunctionAppManagementService(ILogger<FunctionAppManagementService> 
         }
     }
     
+    public async Task SetFunctionDisabled(FunctionAppDetails functionAppDetails, string functionName, bool disabled)
+    {
+        var webSiteResource = _client.GetWebSiteResource(ResourceIdentifier.Parse(functionAppDetails.Id));
+
+        // Fetch the full app-settings collection, mutate only the one Disabled flag, and PUT the
+        // whole dictionary back. A partial update would wipe every other setting.
+        var settings = await webSiteResource.GetApplicationSettingsAsync();
+        FunctionAppSettings.ApplyDisabledSetting(settings.Value.Properties, functionName, disabled);
+        await webSiteResource.UpdateApplicationSettingsAsync(settings.Value);
+
+        await UpdateFunctionDisabledState(functionAppDetails, functionName, disabled);
+        logger.LogInformation("{Action} function {FunctionName} on {FunctionAppName}",
+            disabled ? "Disabled" : "Enabled", functionName, functionAppDetails.Name);
+    }
+
+    private async Task UpdateFunctionDisabledState(FunctionAppDetails functionAppDetails, string functionName, bool disabled)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync();
+
+        var existing = await dbContext.FunctionApps
+            .Include(f => f.Functions)
+            .FirstOrDefaultAsync(f =>
+                f.Name == functionAppDetails.Name && f.ResourceGroup == functionAppDetails.ResourceGroup &&
+                f.Subscription == functionAppDetails.Subscription);
+
+        var function = existing?.Functions.FirstOrDefault(fn => fn.Name == functionName);
+        if (function is not null)
+        {
+            function.IsDisabled = disabled;
+            await dbContext.SaveChangesAsync();
+        }
+    }
+
     private async Task UpdateFunctionApp(FunctionAppDetails functionAppDetails, FunctionState state)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync();

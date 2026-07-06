@@ -17,19 +17,29 @@ Funcy har en solid kärna: snabb cache-först-listning av Function Apps, start/s
 
 Alla fyra implementerades av delegerade agenter och granskades därefter manuellt: varje diff kodgranskades, byggdes om från scratch och testkördes. Två granskningsfynd åtgärdades innan PR: en saknad exception-guard i pin-togglen (#26) och en disposal-race i loggvyns poll-loop (#28).
 
-## Ytterligare features som borde finnas (ej implementerade nu)
+### Omgång 2 (efter feedback)
 
-1. **Förbättrad felytning i UI** (roadmap). Fel från Azure-anrop loggas idag mest till fil; `FunctionAppFetchResult` bär redan felmeddelanden men UI:t visar dem knappt. En dedikerad "problems"-rad/panel vore billig att bygga på samma listpanelsmönster.
-2. **Function detail-vy.** Enter på en funktion går nu till loggvyn; en riktig detaljvy (bindings, senaste körningar, success rate från `requests`) vore nästa steg och kan byggas på samma App Insights-integration.
-3. **Invocations/körhistorik** per funktion (`requests` + `duration`/`success`) med aggregat (t.ex. felprocent senaste timmen) direkt i funktionslistan.
-4. **Åtgärder på Service Bus**: purge DLQ / re-submit av DLQ-meddelanden. Kräver data-plane-rättigheter och försiktighet (destruktivt) — bör gated:as bakom bekräftelse.
-5. **Disable/enable av enskild funktion** (app setting `AzureWebJobs.<name>.Disabled`) — naturlig syskonåtgärd till start/stopp av hela appen.
-6. **Health-kolumn** i app-listan (senaste deploy, runtime-version, HTTPS-only etc. finns redan i Resource Graph-svaret för liten kostnad).
-7. **Resource Graph via SDK i stället för `az`-shellout** (`Azure.ResourceManager.ResourceGraph`) — tar bort beroendet på CLI-extension `resource-graph` och gör felhantering typad. (Teknisk skuld snarare än feature.)
+| Feature | Branch | PR |
+|---|---|---|
+| Appar med pågående operation stannar synliga genom filterbyten (swap-scenariot) | `feat/keep-active-operations-visible` | [#29](https://github.com/Rudenw/Funcy/pull/29) |
+| Disable/enable av enskild funktion (`D`), via `AzureWebJobs.<namn>.Disabled` | `feat/function-disable-toggle` | [#30](https://github.com/Rudenw/Funcy/pull/30) |
+| Felytning i UI: `⚠ N errors`-indikator + Issues-panel (`I`, rensa med `C`) | `feat/error-surfacing` | [#31](https://github.com/Rudenw/Funcy/pull/31) |
+| Environment variables-vy (`V`), maskerade värden, `M` visar vald rad, Key Vault-referenser löses upp | `feat/app-settings-view` | [#32](https://github.com/Rudenw/Funcy/pull/32) |
+
+Beslut i omgång 2: **DLQ-åtgärder skippas** (purge/resubmit — destruktivt, låg nytta just nu). **Live Metrics skippas** — det är genuint realtid (~1 s, QuickPulse-streaming) men flyktigt och utan historik, och huvudbehovet är felsökning i efterhand, vilket loggvyn i #28 täcker.
+
+## Ytterligare features som borde finnas (ej implementerade)
+
+1. **Function detail-vy.** Enter på en funktion går nu till loggvyn; en riktig detaljvy (bindings, senaste körningar, success rate från `requests`) vore nästa steg och kan byggas på samma App Insights-integration.
+2. **Invocations/körhistorik** per funktion (`requests` + `duration`/`success`) med aggregat (t.ex. felprocent senaste timmen) direkt i funktionslistan.
+3. **Health-kolumn** i app-listan (senaste deploy, runtime-version, HTTPS-only etc. finns redan i Resource Graph-svaret för liten kostnad).
+4. **Resource Graph via SDK i stället för `az`-shellout** (`Azure.ResourceManager.ResourceGraph`) — tar bort beroendet på CLI-extension `resource-graph` och gör felhantering typad. (Teknisk skuld snarare än feature.)
+
+*(Felytning och disable/enable implementerades i omgång 2; DLQ-åtgärder och Live Metrics är aktivt bortvalda, se ovan.)*
 
 ## Öppna frågor
 
-1. **Tangentbindningar**: jag valde `O` = Settings, `P` = Pin, `E` = cykla loggtypfilter, Enter på funktion = loggvy. Säg till om andra bindningar känns mer naturliga.
+1. **Tangentbindningar**: totalt nu `O` = Settings, `P` = Pin, `E` = cykla loggtypfilter, Enter på funktion = loggvy, `D` = disable/enable funktion, `V` = environment variables, `M` = maskera/visa värde, `I` = Issues-panel, `C` = rensa fellogg. Säg till om något känns fel — och tangentkartan börjar bli full, så en k9s-liknande kommandorad kan bli aktuell på sikt.
 2. **Settings-vyns "live apply"**: TagColumns-ändringar slår igenom när en panel skapas om (inte retroaktivt på öppen panel). Räcker det, eller ska rotpanelen byggas om direkt vid ändring?
 3. **Service Bus-namespace i annan subscription**: namespace-uppslag görs via Resource Graph över alla åtkomliga subscriptions. Om samma namespace-namn finns i flera tenants/subscriptions tas första träffen — behövs disambiguering?
 4. **Rättigheter för SB-counts**: räkningarna går via ARM (`Microsoft.ServiceBus/namespaces/.../read`), inte data-plane. Har alla tänkta användare Reader på namespace:en? Annars visas `-`.

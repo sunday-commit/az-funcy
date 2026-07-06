@@ -142,11 +142,10 @@ public class SearchInputManagerTests
     }
 
     [Fact]
-    public void SearchMarkup_WithUnescapedBracket_Throws()
+    public void SearchMarkup_WithBracket_RendersEscaped_NoException()
     {
-        // Characterization: user input is not escaped, so a '[' produces invalid Spectre markup
-        // and building SearchMarkup throws.
+        // User input is markup-escaped, so a '[' renders literally instead of throwing.
         var mgr = Typed("a[");
-        Assert.Throws<InvalidOperationException>(() => _ = mgr.SearchMarkup);
+        Assert.Equal("a[  ↩", MarkupText.Plain(mgr.SearchMarkup));
     }
 }

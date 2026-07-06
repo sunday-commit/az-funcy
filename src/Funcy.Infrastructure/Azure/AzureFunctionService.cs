@@ -256,7 +256,10 @@ public class AzureFunctionService(
                 }
 
                 functionList.Add(new Function
-                    { AzureId = websiteFunction.Id.ToString(), Name = websiteFunction.Id.Name, Trigger = Capitalize(trigger) });
+                {
+                    AzureId = websiteFunction.Id.ToString(), Name = websiteFunction.Id.Name, Trigger = Capitalize(trigger),
+                    IsDisabled = websiteFunction.Data.IsDisabled ?? false
+                });
             }
 
             sw.Stop();

@@ -5,16 +5,36 @@ namespace Funcy.Console.Ui.PanelLayout.Renderers;
 
 public class FunctionAppLayoutRenderer(IReadOnlyList<string> tagColumns, Func<string, int> getColumnWidth) : ILayoutRenderer<FunctionAppDetails>
 {
-    public RowMarkup CreateRowMarkup(FunctionAppDetails item)
+    public RowMarkup CreateRowMarkup(FunctionAppDetails item) => CreateRowMarkup(item, bypassed: false);
+
+    public RowMarkup CreateBypassRowMarkup(FunctionAppDetails item) => CreateRowMarkup(item, bypassed: true);
+
+    private RowMarkup CreateRowMarkup(FunctionAppDetails item, bool bypassed)
     {
         var rowMarkup = new RowMarkup
         {
             Key = item.Key
         };
         // Pinned apps get a glyph prefix; the Name sort key stays item.Name so ordering is unaffected.
-        var displayName = item.IsPinned ? $"{UiStyles.PinGlyph} {item.Name}" : item.Name;
-        var unselectedName = item.IsPinned ? $"[{UiStyles.Sort}]{UiStyles.PinGlyph}[/] {item.Name}" : item.Name;
-        rowMarkup.Add("Name", new RowCell(UiStyles.CreateSelectedCell(displayName), new Markup(unselectedName)));
+        var pinPrefix = item.IsPinned ? $"{UiStyles.PinGlyph} " : string.Empty;
+
+        Markup selectedName;
+        Markup unselectedName;
+        if (bypassed)
+        {
+            selectedName = UiStyles.CreateSelectedCell($"{pinPrefix}{UiStyles.BypassGlyph} {item.Name}");
+            unselectedName = item.IsPinned
+                ? new Markup($"[{UiStyles.Sort}]{UiStyles.PinGlyph}[/] " + $"[{UiStyles.Bypass}]{UiStyles.BypassGlyph} {item.Name}[/]")
+                : UiStyles.CreateBypassNameCell(item.Name);
+        }
+        else
+        {
+            selectedName = UiStyles.CreateSelectedCell($"{pinPrefix}{item.Name}");
+            unselectedName = item.IsPinned
+                ? new Markup($"[{UiStyles.Sort}]{UiStyles.PinGlyph}[/] {item.Name}")
+                : new Markup(item.Name);
+        }
+        rowMarkup.Add("Name", new RowCell(selectedName, unselectedName));
 
         foreach (var tag in tagColumns)
         {

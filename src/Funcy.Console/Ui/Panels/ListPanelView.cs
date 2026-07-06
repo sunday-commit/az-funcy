@@ -190,7 +190,11 @@ public class ListPanelView<T> : IActionHandlingPanel, IListPanelView<T> where T 
     {
         return GetSelectedItem()?.Key ?? "";
     }
-    
+
+    // Keys of the rows currently windowed for render, in display order. Reads the same
+    // list the renderer consumes, so it faithfully reflects filtering, the bypass, and order.
+    public IReadOnlyList<string> GetVisibleKeys() => _visibleRows.Select(r => r.Key).ToList();
+
     private void RefreshView()
     {
         lock (_gate)
@@ -236,10 +240,7 @@ public class ListPanelView<T> : IActionHandlingPanel, IListPanelView<T> where T 
         lock (_gate)
         {
             var sorted = GetSortedItemsLocked();
-
-            IReadOnlyList<T> candidates = string.IsNullOrWhiteSpace(_searchText)
-                ? sorted
-                : sorted.Where(item => _searchMatcher.TryMatch(item, _searchText)).ToList();
+            var candidates = FilterCandidatesLocked(sorted);
 
             totalCount = candidates.Count;
 
@@ -249,12 +250,44 @@ public class ListPanelView<T> : IActionHandlingPanel, IListPanelView<T> where T 
             rows = candidates
                 .Skip(skip)
                 .Take(_paginator.MaxVisibleRows)
-                .Select(item => _markupCache[item.Key])
+                // Bypassed rows are rendered on the fly (view-state cue, never highlighted);
+                // matching rows reuse their cached, once-built markup.
+                .Select(c => c.Bypassed ? _layoutRenderer.CreateBypassRowMarkup(c.Item) : _markupCache[c.Item.Key])
                 .ToList();
         }
 
         _visibleRows = rows;
         _paginator.UpdateTotalRows(totalCount);
+    }
+
+    private readonly record struct Candidate(T Item, bool Bypassed);
+
+    // Applies the search filter, then lets rows with an active operation (IOperationVisibility)
+    // bypass a non-matching filter so an in-progress operation stays watchable. Bypassed rows
+    // float to the top; matches keep their relative order below. Call while holding _gate.
+    private List<Candidate> FilterCandidatesLocked(IReadOnlyList<T> sorted)
+    {
+        if (string.IsNullOrWhiteSpace(_searchText))
+        {
+            return sorted.Select(item => new Candidate(item, false)).ToList();
+        }
+
+        var matches = new List<Candidate>();
+        var bypassed = new List<Candidate>();
+        foreach (var item in sorted)
+        {
+            if (_searchMatcher.TryMatch(item, _searchText))
+            {
+                matches.Add(new Candidate(item, false));
+            }
+            else if (item is IOperationVisibility { HasActiveOperation: true })
+            {
+                bypassed.Add(new Candidate(item, true));
+            }
+        }
+
+        bypassed.AddRange(matches);
+        return bypassed;
     }
 
     // Sorts by the active column (falling back to the model's natural IComparable order) and
@@ -298,7 +331,11 @@ public class ListPanelView<T> : IActionHandlingPanel, IListPanelView<T> where T 
         }
 
         var selectedItem = GetSelectedItem();
-        ArgumentNullException.ThrowIfNull(selectedItem);
+        if (selectedItem is null)
+        {
+            return false;
+        }
+
         navigationRequest = _onEnterNavigation(selectedItem);
         return navigationRequest is not null;
     }
@@ -312,7 +349,10 @@ public class ListPanelView<T> : IActionHandlingPanel, IListPanelView<T> where T 
         }
 
         var selectedItem = GetSelectedItem();
-        ArgumentNullException.ThrowIfNull(selectedItem);
+        if (selectedItem is null)
+        {
+            return false;
+        }
 
         navigationRequest = _onActionNavigation(selectedItem);
         return navigationRequest is not null;

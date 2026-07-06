@@ -1,5 +1,6 @@
 using Funcy.Console.Handlers;
 using Funcy.Console.Handlers.Concurrency;
+using Funcy.Console.Settings;
 using Funcy.Console.Ui.Contexts;
 using Funcy.Console.Ui.Controllers;
 using Funcy.Console.Ui.Navigation;
@@ -13,8 +14,22 @@ public sealed class ListPanelContextFactory(
     FunctionStateCoordinator coordinator,
     ListPanelFactory listPanelFactory,
     IUiStatusState uiStatusState,
+    IFuncySettingsService settingsService,
     AppContext appContext)
 {
+    public ListPanelContext CreateSettingsPanel(Action invalidate)
+    {
+        var panel = listPanelFactory.CreateSettingsPanel();
+        var view = (IListPanelView<SettingItemDetails>)panel;
+        var controller = new SettingsListController(view, settingsService, invalidate);
+
+        return new ListPanelContext
+        {
+            View = panel,
+            Controller = controller
+        };
+    }
+
     public ListPanelContext CreateRoot(Action invalidate)
     {
         var panel = listPanelFactory.CreateFunctionAppPanel([]);

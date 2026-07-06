@@ -119,6 +119,8 @@ public class ListPanelPaginator
     
     public void UpdateMaxVisibleRows()
     {
-        MaxVisibleRows = _windowHeight() - 8;
+        // Floor at 0: a tiny terminal (windowHeight < 8) would otherwise make MaxVisibleRows
+        // negative, which silently empties the view (Take(-n)) and corrupts skip/clamp math.
+        MaxVisibleRows = Math.Max(0, _windowHeight() - 8);
     }
 }

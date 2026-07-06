@@ -142,7 +142,10 @@ public class FunctionStateCoordinator
         ConcurrentDictionary<string, CachedFunctionAppModel> subCache,
         FunctionAppUpdate update)
     {
-        if (update.UpdateKind != FunctionAppUpdateKind.Inventory)
+        // Only Details updates carry a fresh Functions/Slots payload. Inventory and StateOnly
+        // updates carry no detail payload, so the cached Functions/Slots must be preserved
+        // instead of being overwritten with the update's empty lists.
+        if (update.UpdateKind == FunctionAppUpdateKind.Details)
         {
             return update.Details;
         }

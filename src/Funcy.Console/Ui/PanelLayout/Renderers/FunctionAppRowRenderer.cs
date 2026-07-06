@@ -5,13 +5,22 @@ namespace Funcy.Console.Ui.PanelLayout.Renderers;
 
 public class FunctionAppLayoutRenderer(IReadOnlyList<string> tagColumns, Func<string, int> getColumnWidth) : ILayoutRenderer<FunctionAppDetails>
 {
-    public RowMarkup CreateRowMarkup(FunctionAppDetails item)
+    public RowMarkup CreateRowMarkup(FunctionAppDetails item) => CreateRowMarkup(item, bypassed: false);
+
+    public RowMarkup CreateBypassRowMarkup(FunctionAppDetails item) => CreateRowMarkup(item, bypassed: true);
+
+    private RowMarkup CreateRowMarkup(FunctionAppDetails item, bool bypassed)
     {
         var rowMarkup = new RowMarkup
         {
             Key = item.Key
         };
-        rowMarkup.Add("Name", new RowCell(UiStyles.CreateSelectedCell(item.Name), new Markup(item.Name)));
+
+        var unselectedName = bypassed ? UiStyles.CreateBypassNameCell(item.Name) : new Markup(item.Name);
+        var selectedName = bypassed
+            ? UiStyles.CreateSelectedCell($"{UiStyles.BypassGlyph} {item.Name}")
+            : UiStyles.CreateSelectedCell(item.Name);
+        rowMarkup.Add("Name", new RowCell(selectedName, unselectedName));
 
         foreach (var tag in tagColumns)
         {

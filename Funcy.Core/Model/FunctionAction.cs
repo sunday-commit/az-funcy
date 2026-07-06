@@ -5,6 +5,7 @@ public enum FunctionAction
     Start,
     Stop,
     Swap,
+    ToggleDisabled,
     Refresh,
     RefreshAll,
     ChangeSubscription,

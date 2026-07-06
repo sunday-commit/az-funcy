@@ -11,7 +11,8 @@ public static class FunctionDetailsMapper
         {
             FunctionAppName = function.FunctionApp?.Name ?? string.Empty,
             Name = function.Name,
-            Trigger = function.Trigger
+            Trigger = function.Trigger,
+            IsDisabled = function.IsDisabled
         };
     }
 }

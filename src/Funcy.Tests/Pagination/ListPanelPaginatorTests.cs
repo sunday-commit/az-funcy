@@ -21,12 +21,31 @@ public class ListPanelPaginatorTests
     [InlineData(30, 22)]
     [InlineData(18, 10)]
     [InlineData(8, 0)]
-    [InlineData(5, -3)] // Characterization: no floor, MaxVisibleRows can go negative for tiny windows.
+    [InlineData(5, 0)] // Floored at 0: MaxVisibleRows never goes negative for tiny windows.
     public void UpdateMaxVisibleRows_IsWindowHeightMinusEight(int windowHeight, int expected)
     {
         var p = Make(windowHeight);
         p.UpdateMaxVisibleRows();
         Assert.Equal(expected, p.MaxVisibleRows);
+    }
+
+    [Fact]
+    public void SelectionMovement_WithZeroRowWindow_DoesNotThrow()
+    {
+        var p = Make(5); // windowHeight 5 -> MaxVisibleRows floored to 0
+        p.UpdateTotalRows(3);
+
+        Assert.Equal(0, p.MaxVisibleRows);
+
+        var ex = Record.Exception(() =>
+        {
+            p.MoveDown();
+            p.MoveUp();
+            p.PageDown();
+            p.PageUp();
+        });
+
+        Assert.Null(ex);
     }
 
     [Fact]

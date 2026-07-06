@@ -15,7 +15,7 @@ namespace Funcy.Data.Migrations
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "10.0.4");
+            modelBuilder.HasAnnotation("ProductVersion", "10.0.7");
 
             modelBuilder.Entity("Funcy.Data.Entities.Function", b =>
                 {
@@ -28,6 +28,9 @@ namespace Funcy.Data.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<long>("FunctionAppId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsDisabled")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")

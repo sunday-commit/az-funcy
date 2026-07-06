@@ -41,8 +41,8 @@ public class UiStatusStateTests
     [Fact]
     public void EndDetailsRefresh_StampsLastRefreshTimestamp()
     {
-        // Characterization: the "last updated" timestamp (exposed as LastInventoryRefreshUtcTicks)
-        // is actually written by EndDetailsRefresh, not by ending inventory validation.
+        // The "last updated" timestamp (exposed as LastInventoryRefreshUtcTicks) is written when
+        // a details refresh completes.
         var s = new UiStatusState();
         s.BeginDetailsRefresh();
         Assert.Equal(0, s.GetSnapshot().LastInventoryRefreshUtcTicks);
@@ -51,12 +51,14 @@ public class UiStatusStateTests
     }
 
     [Fact]
-    public void EndInventoryValidation_DoesNotStampTimestamp()
+    public void EndInventoryValidation_StampsTimestamp()
     {
+        // Inventory validation completing is also a data refresh, so it stamps the timestamp.
         var s = new UiStatusState();
         s.BeginInventoryValidation();
-        s.EndInventoryValidation();
         Assert.Equal(0, s.GetSnapshot().LastInventoryRefreshUtcTicks);
+        s.EndInventoryValidation();
+        Assert.True(s.GetSnapshot().LastInventoryRefreshUtcTicks > 0);
     }
 
     [Fact]

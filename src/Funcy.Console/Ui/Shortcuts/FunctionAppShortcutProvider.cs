@@ -26,7 +26,8 @@ public class FunctionAppShortcutProvider : IShortcutProvider<FunctionAppDetails>
             {new TableIndex(1, 2), new ShortcutMap(ListPanelShortcuts.Start, CanStart(app))},
             {new TableIndex(1, 3), new ShortcutMap(ListPanelShortcuts.Stop, CanStop(app))},
             {new TableIndex(1, 4), new ShortcutMap(ListPanelShortcuts.ChangeSubscription, true)},
-            {new TableIndex(1, 5), new ShortcutMap(ListPanelShortcuts.View, app is not null)}
+            {new TableIndex(1, 5), new ShortcutMap(ListPanelShortcuts.Options, true)},
+            {new TableIndex(1, 6), new ShortcutMap(ListPanelShortcuts.View, app is not null)}
         };
         return shortcutList;
     }

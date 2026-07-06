@@ -1,5 +1,6 @@
 using Funcy.Console.Ui.ConsoleHelper;
 using Funcy.Console.Ui.Contexts;
+using Funcy.Console.Ui.Controllers;
 using Funcy.Console.Ui.Factory;
 using Funcy.Console.Ui.Panels;
 using Funcy.Console.Ui.Panels.Interfaces;
@@ -146,6 +147,16 @@ public sealed class MainContainer : IDisposable
                 ToggleSelectedSubscriptionVisibility();
                 break;
 
+            case var key when
+                key == ListPanelShortcuts.View.Key:
+                AppSettingsView();
+                break;
+
+            case var key when
+                key == ListPanelShortcuts.Mask.Key:
+                ToggleMask();
+                break;
+
             case ConsoleKey.Delete:
                 Current.SearchInputManager.ClearSearchText();
                 SyncSearchUi();
@@ -184,6 +195,37 @@ public sealed class MainContainer : IDisposable
         var nextContext = _listPanelContextFactory.CreateSubscriptionPanel(() => _tcs.TrySetResult());
         _contextStack.Push(nextContext);
         RefreshMainLayout();
+    }
+
+    private void AppSettingsView()
+    {
+        if (!Current.View.IsActionValid(FunctionAction.ViewAppSettings))
+        {
+            return;
+        }
+
+        var selectedKey = Current.View.GetSelectedItemKey();
+        if (string.IsNullOrEmpty(selectedKey))
+        {
+            return;
+        }
+
+        var nextContext = _listPanelContextFactory.CreateAppSettingsPanel(selectedKey, () => _tcs.TrySetResult());
+        _contextStack.Push(nextContext);
+        RefreshMainLayout();
+    }
+
+    private void ToggleMask()
+    {
+        if (!Current.View.IsActionValid(FunctionAction.ToggleMask))
+        {
+            return;
+        }
+
+        if (Current.Controller is IMaskToggleController maskController)
+        {
+            maskController.ToggleSelectedMask();
+        }
     }
 
     private void ToggleSubscriptionFilter()

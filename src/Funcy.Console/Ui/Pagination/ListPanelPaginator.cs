@@ -23,9 +23,9 @@ public class ListPanelPaginator
 
     public void UpdateTotalRows(int amountOfRows)
     {
-        _amountOfRows = amountOfRows;
+        _amountOfRows = Math.Max(0, amountOfRows);
         UpdateMaxVisibleRows();
-        
+
         if (SelectedIndex + VisibleStartIndex >= _amountOfRows)
         {
             SelectedIndex = Math.Min(SelectedIndex, _amountOfRows - VisibleStartIndex - 1);
@@ -34,6 +34,23 @@ public class ListPanelPaginator
                 SelectedIndex = 0;
                 VisibleStartIndex = 0;
             }
+        }
+
+        // The window can shrink faster than the selection moves — e.g. a terminal resize that
+        // drops MaxVisibleRows, or the list changing under a scrolled window. When that happens the
+        // clamp above (which only reacts to SelectedIndex + VisibleStartIndex crossing the total)
+        // does not fire, leaving VisibleStartIndex past the last page and SelectedIndex past the
+        // now-visible window. Both must be pulled back in, otherwise the view indexes _visibleRows
+        // out of range (GetSelectedItem) and either throws or renders a blank frame.
+        var maxStart = Math.Max(0, _amountOfRows - MaxVisibleRows);
+        if (VisibleStartIndex > maxStart)
+        {
+            VisibleStartIndex = maxStart;
+        }
+
+        if (SelectedIndex >= MaxVisibleRows)
+        {
+            SelectedIndex = Math.Max(0, MaxVisibleRows - 1);
         }
     }
 

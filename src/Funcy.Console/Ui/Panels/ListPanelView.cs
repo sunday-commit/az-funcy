@@ -225,7 +225,11 @@ public class ListPanelView<T> : IActionHandlingPanel, IListPanelView<T> where T 
             return default;
         }
 
-        var selectedItemKey = rows[_paginator.SelectedIndex].Key;
+        // Defensive clamp: RebuildVisibleRows keeps SelectedIndex inside the window, but this is
+        // also reachable between a background model change and the next rebuild, so never let a
+        // stale index run off the end of the rows actually on screen.
+        var selectedIndex = Math.Clamp(_paginator.SelectedIndex, 0, rows.Count - 1);
+        var selectedItemKey = rows[selectedIndex].Key;
         lock (_gate)
         {
             _items.TryGetValue(selectedItemKey, out var item);
@@ -291,6 +295,11 @@ public class ListPanelView<T> : IActionHandlingPanel, IListPanelView<T> where T 
 
             totalCount = candidates.Count;
 
+            // Reconcile the paginator to the current candidate count *before* slicing, so the
+            // scroll offset and selection are clamped into range and the window we cut below can
+            // never start past the end or point the selection outside _visibleRows.
+            _paginator.UpdateTotalRows(totalCount);
+
             // Keep short result sets visible: if everything fits, ignore the scroll offset.
             var skip = candidates.Count < _paginator.MaxVisibleRows ? 0 : _paginator.VisibleStartIndex;
 
@@ -304,7 +313,6 @@ public class ListPanelView<T> : IActionHandlingPanel, IListPanelView<T> where T 
         }
 
         _visibleRows = rows;
-        _paginator.UpdateTotalRows(totalCount);
     }
 
     private readonly record struct Candidate(T Item, bool Bypassed);

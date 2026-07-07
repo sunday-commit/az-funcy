@@ -19,9 +19,11 @@ public sealed class MainContainer : IDisposable
     private readonly IActionDispatcher _actionDispatcher;
     private readonly IDetailsLoader _detailsLoader;
     private readonly UiStateMarkupProvider _uiStateMarkupProvider;
+    private readonly IUiErrorLog _errorLog;
     private readonly TopPanel _topPanel;
     private readonly AppContext _appContext;
     private readonly IAzureSessionMonitor _sessionMonitor;
+    private static readonly Markup EmptyMarkup = new("");
     private TaskCompletionSource _tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     private readonly Stack<ListPanelContext> _contextStack = new();
@@ -46,6 +48,7 @@ public sealed class MainContainer : IDisposable
         IActionDispatcher actionDispatcher,
         IDetailsLoader detailsLoader,
         UiStateMarkupProvider uiStateMarkupProvider,
+        IUiErrorLog errorLog,
         AppContext appContext,
         IAzureSessionMonitor sessionMonitor,
         ITagCatalog tagCatalog,
@@ -55,6 +58,7 @@ public sealed class MainContainer : IDisposable
         _actionDispatcher = actionDispatcher;
         _detailsLoader = detailsLoader;
         _uiStateMarkupProvider = uiStateMarkupProvider;
+        _errorLog = errorLog;
         _appContext = appContext;
         _sessionMonitor = sessionMonitor;
         _tagCatalog = tagCatalog;
@@ -62,6 +66,8 @@ public sealed class MainContainer : IDisposable
         _settingsService.ColumnsChanged += RebuildRootPanel;
         _topPanel = new TopPanel(appContext);
 
+        // New errors arrive on background threads; wake the render loop so the indicator updates.
+        _errorLog.Changed += OnErrorLogChanged;
         // Background session-state changes wake the render loop; the banner is computed on the
         // render thread in UpdateUiStatus (no Spectre access off the render thread).
         _sessionMonitor.Changed += OnSessionChanged;
@@ -107,6 +113,7 @@ public sealed class MainContainer : IDisposable
         UpdateUiStatus();
     }
 
+    private void OnErrorLogChanged() => _tcs.TrySetResult();
     private void OnSessionChanged() => _tcs.TrySetResult();
 
     // Applies a completed tag-suggestion fetch on the render thread. Called from HandleUpdate,
@@ -135,6 +142,7 @@ public sealed class MainContainer : IDisposable
 
         var uiStatusSnapshot = Current.View.GetUiStatusSnapshot();
         _topPanel.SetUiStatusText(_uiStateMarkupProvider.CreateMarkupFromUiStatusState(uiStatusSnapshot));
+        _topPanel.SetErrorIndicator(UiStyles.CreateErrorIndicator(_errorLog.Count) ?? EmptyMarkup);
     }
 
     private void UpdateShortcuts()
@@ -209,6 +217,16 @@ public sealed class MainContainer : IDisposable
                 break;
 
             case var key when
+                key == ListPanelShortcuts.Issues.Key:
+                IssuesView();
+                break;
+
+            case var key when
+                key == ListPanelShortcuts.ClearIssues.Key:
+                ClearIssues();
+                break;
+
+            case var key when
                 key == ListPanelShortcuts.ReLogin.Key:
                 // Only acts when the session is Expired; the monitor ignores it otherwise.
                 _sessionMonitor.BeginReLogin();
@@ -277,6 +295,19 @@ public sealed class MainContainer : IDisposable
         RefreshMainLayout();
     }
 
+    private void IssuesView()
+    {
+        // Avoid stacking duplicate Issues panels if I is pressed while one is already open.
+        if (Current.Controller is UiErrorListController)
+        {
+            return;
+        }
+
+        var nextContext = _listPanelContextFactory.CreateIssuesPanel(() => _tcs.TrySetResult());
+        _contextStack.Push(nextContext);
+        RefreshMainLayout();
+    }
+
     private void AppSettingsView()
     {
         if (!Current.View.IsActionValid(FunctionAction.ViewAppSettings))
@@ -330,6 +361,17 @@ public sealed class MainContainer : IDisposable
         var nextContext = _listPanelContextFactory.CreateSettingsPanel(() => _tcs.TrySetResult());
         _contextStack.Push(nextContext);
         RefreshMainLayout();
+    }
+
+    private void ClearIssues()
+    {
+        // Clear is only meaningful inside the Issues panel.
+        if (Current.Controller is not UiErrorListController)
+        {
+            return;
+        }
+
+        _errorLog.Clear();
     }
 
     private void ToggleMask()
@@ -581,6 +623,7 @@ public sealed class MainContainer : IDisposable
 
     public void Dispose()
     {
+        _errorLog.Changed -= OnErrorLogChanged;
         _sessionMonitor.Changed -= OnSessionChanged;
         _settingsService.ColumnsChanged -= RebuildRootPanel;
 

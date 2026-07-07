@@ -92,6 +92,7 @@ var host = Host.CreateDefaultBuilder(args)
         services.AddSingleton<IAnimationProvider>(sp => sp.GetRequiredService<AnimationHandler>());
         services.AddSingleton<FunctionStateCoordinator>();
         services.AddSingleton<IUiStatusState, UiStatusState>();
+        services.AddSingleton<IUiErrorLog, UiErrorLog>();
         services.AddSingleton<AppContext>();
         services.AddTransient<FunctionStatusManager>();
         services.AddTransient<AzureSubscriptionService>();

@@ -19,6 +19,8 @@ public static class ListPanelShortcuts
     public static readonly Shortcut Mask = new(ConsoleKey.M, "M", "Reveal");
     public static readonly Shortcut Options = new(ConsoleKey.O, "O", "Options");
     public static readonly Shortcut Edit = new(ConsoleKey.Enter, "↩", "Edit");
+    public static readonly Shortcut Issues = new(ConsoleKey.I, "I", "Issues");
+    public static readonly Shortcut ClearIssues = new(ConsoleKey.C, "C", "Clear");
 }
 
 public record TableIndex(int Row, int Column);

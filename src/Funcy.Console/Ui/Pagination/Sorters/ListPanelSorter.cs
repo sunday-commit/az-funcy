@@ -57,16 +57,15 @@ public sealed class ListPanelSorter<T> : ISorter<T>
 
         var sel = _map[CurrentColumn.Value].Selector;
 
-        if (SupportsPinning)
-        {
-            var pinnedFirst = source.OrderByDescending(IsPinned);
-            var withColumn = Desc ? pinnedFirst.ThenByDescending(sel) : pinnedFirst.ThenBy(sel);
-            return withColumn.ToList();
-        }
+        // Rows with no value for this column (null selector result — e.g. an app whose Service Bus
+        // counts haven't resolved, or a function with no queue) always sink to the bottom, in both
+        // directions. Otherwise an ascending sort leads with a block of blanks; the user wants the
+        // first real value (0) at the top and the empties out of the way.
+        IOrderedEnumerable<T> ordered = SupportsPinning
+            ? source.OrderByDescending(IsPinned).ThenBy(x => sel(x) is null)
+            : source.OrderBy(x => sel(x) is null);
 
-        var ordered = Desc
-            ? source.OrderByDescending(sel)
-            : source.OrderBy(sel);
+        ordered = Desc ? ordered.ThenByDescending(sel) : ordered.ThenBy(sel);
 
         return ordered.ToList();
     }

@@ -97,6 +97,16 @@ public class FunctionAppLayoutRenderer(
         rowMarkup.Add("DLQ", new RowCell(UiStyles.CreateSelectedCell(dlq), dlqUnselected));
     }
 
+    // Sort key for the Msgs/DLQ columns: the aggregated count, but null while the cell renders
+    // empty (the app has no Service Bus functions or its counts haven't all resolved). Keeping the
+    // key null in that case lets the sorter sink the blanks to the bottom instead of ordering them
+    // as zeros ahead of the real values.
+    private static object? CountSortKey(FunctionAppDetails app, Func<ServiceBusAppCounts, long> pick)
+    {
+        var counts = ServiceBusCountAggregator.Aggregate(app);
+        return counts is { HasServiceBusFunctions: true, AllLoaded: true } ? pick(counts) : null;
+    }
+
     public ColumnLayout<FunctionAppDetails> CreateColumnLayout()
     {
         var columns = new List<Column<FunctionAppDetails>>
@@ -115,8 +125,8 @@ public class FunctionAppLayoutRenderer(
 
         if (showServiceBusCounts)
         {
-            columns.Add(new Column<FunctionAppDetails>("Msgs", f => ServiceBusCountAggregator.Aggregate(f).ActiveMessages, CountWidth, Alignment: Justify.Right));
-            columns.Add(new Column<FunctionAppDetails>("DLQ", f => ServiceBusCountAggregator.Aggregate(f).DeadLetteredMessages, CountWidth, Alignment: Justify.Right));
+            columns.Add(new Column<FunctionAppDetails>("Msgs", f => CountSortKey(f, c => c.ActiveMessages), CountWidth, Alignment: Justify.Right));
+            columns.Add(new Column<FunctionAppDetails>("DLQ", f => CountSortKey(f, c => c.DeadLetteredMessages), CountWidth, Alignment: Justify.Right));
         }
 
         // Trailing animation column flexes so leftover width parks here as a right-hand margin

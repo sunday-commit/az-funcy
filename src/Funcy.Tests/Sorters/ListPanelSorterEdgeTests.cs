@@ -61,13 +61,25 @@ public class ListPanelSorterEdgeTests
     }
 
     [Fact]
-    public void Sort_NullValues_SortFirstAscending()
+    public void Sort_NullValues_SinkToBottom_Ascending()
     {
-        // Characterization: LINQ OrderBy places null keys before non-null in ascending order.
+        // Blanks (null key) always sort last, so ascending leads with the first real value, not
+        // a run of empty cells.
         var sorter = MakeSorter();
         sorter.Toggle(2);
         var result = sorter.Sort([new("a", 10), new("b", null), new("c", 5)]);
-        Assert.Equal([null, 5, 10], result.Select(r => r.Value));
+        Assert.Equal([5, 10, null], result.Select(r => r.Value));
+    }
+
+    [Fact]
+    public void Sort_NullValues_SinkToBottom_Descending()
+    {
+        // Blanks stay at the bottom in descending order too (they're not "large", just absent).
+        var sorter = MakeSorter();
+        sorter.Toggle(2);
+        sorter.Toggle(2); // descending
+        var result = sorter.Sort([new("a", 10), new("b", null), new("c", 5)]);
+        Assert.Equal([10, 5, null], result.Select(r => r.Value));
     }
 
     [Fact]

@@ -9,9 +9,10 @@ public static class SettingDescriptors
         new SettingDescriptor
         {
             Name = "TagColumns",
-            Description = "Tag names shown as columns (comma-separated)",
+            Description = "Tag names shown as columns (Enter to pick)",
             Format = s => string.Join(", ", s.TagColumns),
-            Parse = SettingParsers.ParseTagColumns
+            Parse = SettingParsers.ParseTagColumns,
+            Kind = SettingKind.TagSelection
         },
         new SettingDescriptor
         {
@@ -37,9 +38,12 @@ public static class SettingDescriptors
         new SettingDescriptor
         {
             Name = "ShowServiceBusInAppList",
-            Description = "Show Service Bus message counts in the app list",
+            Description = "Show Service Bus message counts in the app list (Enter to toggle)",
             Format = s => s.ShowServiceBusInAppList ? "true" : "false",
-            Parse = SettingParsers.ParseShowServiceBusInAppList
+            Parse = SettingParsers.ParseShowServiceBusInAppList,
+            Kind = SettingKind.Toggle,
+            Toggle = s => s.ShowServiceBusInAppList = !s.ShowServiceBusInAppList,
+            IsOn = s => s.ShowServiceBusInAppList
         }
     ];
 
@@ -52,6 +56,8 @@ public static class SettingDescriptors
             Order = i,
             Name = d.Name,
             Value = d.Format(settings),
-            Description = d.Description
+            Description = d.Description,
+            Kind = d.Kind,
+            IsOn = d.IsOn?.Invoke(settings) ?? false
         }).ToList();
 }

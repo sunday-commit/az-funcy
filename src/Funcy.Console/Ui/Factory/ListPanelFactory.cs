@@ -54,6 +54,16 @@ public sealed class ListPanelFactory(
             "Settings");
     }
 
+    public IListPanel CreateTagSelectionPanel()
+    {
+        return CreateFromList(
+            new TagChoiceMatcher(),
+            new TagChoiceLayoutRenderer(),
+            new TagSelectionShortcutProvider(),
+            null,
+            "Tag columns");
+    }
+
     public IListPanel CreateFunctionAppPanel(IReadOnlyList<FunctionAppDetails> apps)
     {
         var settings = settingsService.Current;

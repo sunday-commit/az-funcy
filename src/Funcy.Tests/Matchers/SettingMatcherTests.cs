@@ -9,7 +9,7 @@ public class SettingMatcherTests
     private readonly SettingMatcher _sut = new();
 
     private static SettingItemDetails MakeItem(string name, string description) =>
-        new() { Order = 0, Name = name, Value = "value", Description = description };
+        new() { Order = 0, Name = name, Value = "value", Description = description, Kind = SettingKind.Text };
 
     [Fact]
     public void Match_WhenNameContainsInput()

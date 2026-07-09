@@ -12,5 +12,9 @@ public interface IFuncySettingsService
     // their columns live.
     event Action? ColumnsChanged;
 
+    // Raised by UpdateAsync after every commit (any setting), so an open settings panel can
+    // rebuild its rows live — including when a sub-panel (the tag picker) made the change.
+    event Action? Changed;
+
     Task UpdateAsync(Action<FuncySettings> mutate);
 }

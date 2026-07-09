@@ -38,25 +38,49 @@ public class SettingsListControllerTests : IDisposable
     }
 
     [Fact]
-    public void TryBeginEdit_ReturnsCurrentRawValue()
+    public void ActivateSelected_TextSetting_ReturnsTextEditWithRawValue()
     {
         var (controller, _) = Make();
         _view.SelectedKey = "SubscriptionRefreshIntervalMinutes";
 
-        var ok = controller.TryBeginEdit(out var key, out var value);
+        var activation = controller.ActivateSelected(out var key, out var value);
 
-        Assert.True(ok);
+        Assert.Equal(SettingActivation.TextEdit, activation);
         Assert.Equal("SubscriptionRefreshIntervalMinutes", key);
         Assert.Equal("60", value);
     }
 
     [Fact]
-    public void TryBeginEdit_UnknownKey_ReturnsFalse()
+    public void ActivateSelected_UnknownKey_ReturnsHandled()
     {
         var (controller, _) = Make();
         _view.SelectedKey = "NotASetting";
 
-        Assert.False(controller.TryBeginEdit(out _, out _));
+        Assert.Equal(SettingActivation.Handled, controller.ActivateSelected(out _, out _));
+    }
+
+    [Fact]
+    public void ActivateSelected_ToggleSetting_FlipsPersistsAndRebuilds()
+    {
+        var (controller, service) = Make();
+        _view.SelectedKey = "ShowServiceBusInAppList";
+        Assert.False(service.Current.ShowServiceBusInAppList);
+
+        var activation = controller.ActivateSelected(out _, out _);
+
+        Assert.Equal(SettingActivation.Handled, activation);
+        Assert.True(service.Current.ShowServiceBusInAppList);
+        var row = _view.LastItems.Single(i => i.Name == "ShowServiceBusInAppList");
+        Assert.True(row.IsOn);
+    }
+
+    [Fact]
+    public void ActivateSelected_TagColumns_ReturnsOpenTagSelection()
+    {
+        var (controller, _) = Make();
+        _view.SelectedKey = "TagColumns";
+
+        Assert.Equal(SettingActivation.OpenTagSelection, controller.ActivateSelected(out _, out _));
     }
 
     [Fact]

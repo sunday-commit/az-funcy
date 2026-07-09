@@ -20,6 +20,7 @@ public static class ListPanelShortcuts
     public static readonly Shortcut Copy = new(ConsoleKey.C, "C", "Copy");
     public static readonly Shortcut Options = new(ConsoleKey.O, "O", "Options");
     public static readonly Shortcut Edit = new(ConsoleKey.Enter, "↩", "Edit");
+    public static readonly Shortcut Select = new(ConsoleKey.Enter, "↩", "Select");
     public static readonly Shortcut Issues = new(ConsoleKey.I, "I", "Issues");
     public static readonly Shortcut ClearIssues = new(ConsoleKey.C, "C", "Clear");
 }

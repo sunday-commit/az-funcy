@@ -10,6 +10,10 @@ public sealed class SettingItemDetails : IComparable<SettingItemDetails>, IHasKe
     public required string Name { get; init; }
     public required string Value { get; init; }
     public required string Description { get; init; }
+    public required SettingKind Kind { get; init; }
+
+    // Only meaningful for Kind == Toggle; drives the On/Off checkbox rendering.
+    public bool IsOn { get; init; }
 
     public string Key => Name;
 

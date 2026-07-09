@@ -29,6 +29,10 @@ public static class UiStyles
     // Success tick, e.g. the transient "copied to clipboard" confirmation.
     public static readonly string OkGlyph = Unicode ? "✓" : "+";
 
+    // Filled/empty markers for boolean toggles and checklist selection (no markup-reserved chars).
+    public static readonly string ToggleOn = Unicode ? "●" : "*";
+    public static readonly string ToggleOff = Unicode ? "○" : "-";
+
     public static Markup CreateLabelMarkup(string text) => new($"[{Label}]{text}[/]");
 
     public static Markup CreateShortcutMarkup(string shortcut, string description, bool isEnabled = true)

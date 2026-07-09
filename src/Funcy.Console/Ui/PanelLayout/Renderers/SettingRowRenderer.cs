@@ -7,16 +7,40 @@ public class SettingLayoutRenderer : ILayoutRenderer<SettingItemDetails>
 {
     public RowMarkup CreateRowMarkup(SettingItemDetails item)
     {
-        var value = item.Value.EscapeMarkup();
         var rowMarkup = new RowMarkup
         {
             Key = item.Key
         };
         rowMarkup.Add("Setting", new RowCell(UiStyles.CreateSelectedCell(item.Name), new Markup(item.Name)));
-        rowMarkup.Add("Value", new RowCell(UiStyles.CreateSelectedCell(value), new Markup(value)));
+
+        var (plain, styled) = FormatValue(item);
+        rowMarkup.Add("Value", new RowCell(UiStyles.CreateSelectedCell(plain), new Markup(styled)));
+
         rowMarkup.Add("Description", new RowCell(UiStyles.CreateSelectedCell(item.Description), new Markup(item.Description)));
 
         return rowMarkup;
+    }
+
+    // Returns the value cell as (plain, styled): the plain form is markup-safe for the selected
+    // (highlighted) cell; the styled form carries colour for the unselected cell.
+    private static (string Plain, string Styled) FormatValue(SettingItemDetails item)
+    {
+        switch (item.Kind)
+        {
+            case SettingKind.Toggle:
+            {
+                var plain = item.IsOn ? $"{UiStyles.ToggleOn} On" : $"{UiStyles.ToggleOff} Off";
+                var styled = item.IsOn ? plain : $"[{UiStyles.Hint}]{plain}[/]";
+                return (plain, styled);
+            }
+            case SettingKind.TagSelection when string.IsNullOrWhiteSpace(item.Value):
+                return ("none", $"[{UiStyles.Hint}]none[/]");
+            default:
+            {
+                var escaped = item.Value.EscapeMarkup();
+                return (escaped, escaped);
+            }
+        }
     }
 
     public ColumnLayout<SettingItemDetails> CreateColumnLayout()

@@ -33,6 +33,7 @@ public sealed class FuncySettingsService : IFuncySettingsService
     }
 
     public event Action? ColumnsChanged;
+    public event Action? Changed;
 
     public Task UpdateAsync(Action<FuncySettings> mutate)
     {
@@ -56,6 +57,8 @@ public sealed class FuncySettingsService : IFuncySettingsService
         {
             ColumnsChanged?.Invoke();
         }
+
+        Changed?.Invoke();
 
         return Task.CompletedTask;
     }

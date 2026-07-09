@@ -99,9 +99,23 @@ public sealed class MainContainer : IDisposable
         HandleUpdate();
         SyncSearchUi();
 
+        // On the settings-family panels the subscription/status line is noise; swap it for a hint.
+        _topPanel.SetContextHint(ContextHint());
+
         MainLayout["TopPanel"].Update(_topPanel.Panel);
         MainLayout["BodyPanel"].Update(Current.View.Panel);
     }
+
+    // A short "how to use this panel" hint shown in place of the subscription line, or null when
+    // the normal subscription header should show.
+    private string? ContextHint() => Current.Controller switch
+    {
+        TagSelectionController => $"[{UiStyles.Hint}]Enter to select · Esc to go back[/]",
+        SettingsListController => $"[{UiStyles.Hint}]Enter to change · Esc to go back[/]",
+        _ => null
+    };
+
+    private bool IsSettingsContext => Current.Controller is SettingsListController or TagSelectionController;
 
     public void HandleUpdate()
     {
@@ -137,6 +151,15 @@ public sealed class MainContainer : IDisposable
         if (banner is not null)
         {
             _topPanel.SetUiStatusText(banner);
+            return;
+        }
+
+        // Settings-family panels don't have Azure status to show; keep the status line clear so the
+        // contextual hint on the line above reads as the whole story.
+        if (IsSettingsContext)
+        {
+            _topPanel.SetUiStatusText(EmptyMarkup);
+            _topPanel.SetErrorIndicator(EmptyMarkup);
             return;
         }
 
@@ -262,15 +285,7 @@ public sealed class MainContainer : IDisposable
                 break;
 
             case ConsoleKey.Enter:
-                if (Current.Controller is IEditablePanel editable
-                    && editable.TryBeginEdit(out var editKey, out var currentValue))
-                {
-                    EnterEditMode(editKey, currentValue);
-                }
-                else
-                {
-                    TryPushNextPanelFromSelection();
-                }
+                HandleEnter();
                 break;
 
             case ConsoleKey.Escape:
@@ -394,6 +409,42 @@ public sealed class MainContainer : IDisposable
         {
             maskController.ToggleSelectedMask();
         }
+    }
+
+    // Enter routing: settings rows toggle/edit/open-picker per their kind, the tag picker toggles
+    // the selected tag, everything else navigates into the next panel.
+    private void HandleEnter()
+    {
+        switch (Current.Controller)
+        {
+            case SettingsListController settings:
+                switch (settings.ActivateSelected(out var key, out var rawValue))
+                {
+                    case SettingActivation.TextEdit:
+                        EnterEditMode(key, rawValue);
+                        break;
+                    case SettingActivation.OpenTagSelection:
+                        OpenTagSelection();
+                        break;
+                    // Handled: a toggle was applied and the view already invalidated.
+                }
+                break;
+
+            case IToggleSelectionController picker:
+                picker.ToggleSelected();
+                break;
+
+            default:
+                TryPushNextPanelFromSelection();
+                break;
+        }
+    }
+
+    private void OpenTagSelection()
+    {
+        var nextContext = _listPanelContextFactory.CreateTagSelectionPanel(() => _tcs.TrySetResult());
+        _contextStack.Push(nextContext);
+        RefreshMainLayout();
     }
 
     private void CopySelectedValue()

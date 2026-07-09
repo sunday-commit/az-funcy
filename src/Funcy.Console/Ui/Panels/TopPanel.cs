@@ -157,6 +157,22 @@ public class TopPanel
         }
     }
     
+    // Swaps the subscription header (row 0) for a contextual hint, or restores it when hint is
+    // null. Lets a panel that has no subscription/status context (settings) reuse the same row.
+    public void SetContextHint(string? hintMarkup)
+    {
+        if (hintMarkup is null)
+        {
+            _dataTable.Rows.Update(0, 0, UiStyles.CreateLabelMarkup("Subscription:"));
+            _dataTable.Rows.Update(0, 1, new Markup(_subscriptionName));
+        }
+        else
+        {
+            _dataTable.Rows.Update(0, 0, new Markup(""));
+            _dataTable.Rows.Update(0, 1, new Markup(hintMarkup));
+        }
+    }
+
     public void SetSearchText(Markup searchMarkup)
     {
         UpdateSearchCell(searchMarkup);

@@ -27,7 +27,7 @@ public sealed class ListPanelContextFactory(
     IFuncySettingsService settingsService,
     ILoggerFactory loggerFactory,
     ILogQueryExecutor logQueryExecutor,
-    IAppInsightsResolver appInsightsResolver)
+    IAppInsightsResolver appInsightsResolver,
     ITagCatalog tagCatalog)
 {
     public ListPanelContext CreateIssuesPanel(Action invalidate)

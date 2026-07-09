@@ -14,4 +14,5 @@ public sealed record LogQueryRequest(
     string FunctionAppName,
     string FunctionName,
     DateTimeOffset? Since,
-    int MaxRows);
+    int MaxRows,
+    TimeSpan Lookback);

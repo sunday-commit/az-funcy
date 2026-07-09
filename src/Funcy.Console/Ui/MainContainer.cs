@@ -225,6 +225,11 @@ public sealed class MainContainer : IDisposable
                 break;
 
             case var key when
+                key == ListPanelShortcuts.LogWindow.Key:
+                Current.Controller.ToggleLookback();
+                break;
+
+            case var key when
                 key == ListPanelShortcuts.RefreshAll.Key:
                 LoadAllDetails();
                 break;

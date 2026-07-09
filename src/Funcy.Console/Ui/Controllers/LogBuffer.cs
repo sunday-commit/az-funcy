@@ -37,6 +37,14 @@ public sealed class LogBuffer(int capacity)
 
     public int Count => _entries.Count;
 
+    // Drops every entry so the next poll refetches the whole window from scratch (used when the
+    // lookback window changes and the retained set no longer matches the requested range).
+    public void Clear()
+    {
+        _entries.Clear();
+        MaxTimestamp = null;
+    }
+
     // Newest-first snapshot filtered by type. LogEntryDetails.CompareTo already orders descending.
     public IReadOnlyList<LogEntryDetails> Snapshot(LogTypeFilter filter)
     {

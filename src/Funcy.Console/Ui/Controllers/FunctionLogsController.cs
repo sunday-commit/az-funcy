@@ -5,15 +5,15 @@ using Spectre.Console;
 
 namespace Funcy.Console.Ui.Controllers;
 
-// Streams a single function's Application Insights telemetry into a list panel, polling as close
-// to realtime as ingestion allows. All view mutation goes through SetAll/SetHeader/invalidate;
-// the Spectre table itself is only ever touched on the render thread.
+// Loads a single function's Application Insights telemetry into a list panel. Fetches once on
+// open and then only on demand (R) — there is no background polling. All view mutation goes
+// through SetAll/SetHeader/invalidate; the Spectre table itself is only ever touched on the
+// render thread.
 public sealed class FunctionLogsController : ListPanelControllerBase<LogEntryDetails>
 {
     private const int InitialMaxRows = 200;
     private const int IncrementalMaxRows = 200;
     private const int BufferCapacity = 1000;
-    private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(5);
     // Small overlap so entries arriving out of order around the boundary are not missed; dedupe
     // by Key removes the duplicates that the overlap re-fetches.
     private static readonly TimeSpan PollOverlap = TimeSpan.FromSeconds(30);
@@ -31,6 +31,7 @@ public sealed class FunctionLogsController : ListPanelControllerBase<LogEntryDet
     private readonly CancellationTokenSource _cts = new();
 
     private LogTypeFilter _filter = LogTypeFilter.All;
+    private LogLookback _lookback = LogLookback.OneHour;
     private DateTimeOffset? _lastPolled;
 
     public FunctionLogsController(
@@ -77,6 +78,23 @@ public sealed class FunctionLogsController : ListPanelControllerBase<LogEntryDet
         _invalidate?.Invoke();
     }
 
+    public override void ToggleLookback()
+    {
+        lock (_sync)
+        {
+            _lookback = _lookback.Next();
+            // The retained entries no longer match the requested range; drop them so the next
+            // fetch reloads the whole window (since = null).
+            _buffer.Clear();
+            View.SetEmptyStateMessage($"[gray]Loading last {_lookback.ToDisplayLabel()}…[/]");
+            ApplyViewLocked();
+        }
+
+        _invalidate?.Invoke();
+        // Re-fetch immediately with the new window.
+        Refresh();
+    }
+
     private async Task PollLoopAsync(CancellationToken cancellationToken)
     {
         try
@@ -89,10 +107,13 @@ public sealed class FunctionLogsController : ListPanelControllerBase<LogEntryDet
                 return;
             }
 
+            // Initial load, then block until the user asks for a refresh (R) or changes the
+            // lookback window — no periodic polling.
+            await PollOnceAsync(resourceId, cancellationToken);
             while (!cancellationToken.IsCancellationRequested)
             {
+                await _pollNow.WaitAsync(cancellationToken);
                 await PollOnceAsync(resourceId, cancellationToken);
-                await _pollNow.WaitAsync(PollInterval, cancellationToken);
             }
         }
         catch (OperationCanceledException)
@@ -108,16 +129,18 @@ public sealed class FunctionLogsController : ListPanelControllerBase<LogEntryDet
     private async Task PollOnceAsync(string resourceId, CancellationToken cancellationToken)
     {
         DateTimeOffset? since;
+        LogLookback lookback;
         lock (_sync)
         {
             since = _buffer.MaxTimestamp is { } max ? max - PollOverlap : null;
+            lookback = _lookback;
         }
 
         try
         {
             var maxRows = since is null ? InitialMaxRows : IncrementalMaxRows;
             var entries = await _executor.QueryAsync(
-                new LogQueryRequest(resourceId, _functionAppName, _functionName, since, maxRows),
+                new LogQueryRequest(resourceId, _functionAppName, _functionName, since, maxRows, lookback.ToTimeSpan()),
                 cancellationToken);
 
             lock (_sync)
@@ -153,9 +176,12 @@ public sealed class FunctionLogsController : ListPanelControllerBase<LogEntryDet
 
     private void UpdateHeader()
     {
-        var polled = _lastPolled is { } p ? p.ToString("HH:mm:ss") : "—";
+        var refreshed = _lastPolled is { } p ? p.ToString("HH:mm:ss") : "—";
         var count = _buffer.Count;
-        View.SetHeader($"Logs: {Markup.Escape(_functionName)} [yellow]{_filter.ToDisplayLabel()}[/] (polled {polled}, {count} entries)");
+        View.SetHeader(
+            $"Logs: {Markup.Escape(_functionName)} " +
+            $"[yellow]{_filter.ToDisplayLabel()}[/] · last [yellow]{_lookback.ToDisplayLabel()}[/] " +
+            $"(refreshed {refreshed}, {count} entries)");
     }
 
     public override void Dispose()

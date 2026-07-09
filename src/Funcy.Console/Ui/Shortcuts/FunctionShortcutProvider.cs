@@ -11,6 +11,8 @@ public class FunctionShortcutProvider : IShortcutProvider<FunctionDetails>
             {new TableIndex(0, 2), new ShortcutMap(ListPanelShortcuts.Filter, true)},
             {new TableIndex(0, 3), new ShortcutMap(ListPanelShortcuts.DisableEnable, CanToggle(function))},
             {new TableIndex(0, 4), new ShortcutMap(ListPanelShortcuts.Refresh, true)},
+            // Enter opens the selected function's Application Insights logs.
+            {new TableIndex(1, 2), new ShortcutMap(ListPanelShortcuts.ViewLogs, function is not null)},
         };
         return shortcutList;
     }

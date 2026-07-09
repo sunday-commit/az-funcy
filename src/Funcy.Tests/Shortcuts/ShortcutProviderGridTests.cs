@@ -178,16 +178,18 @@ public class ShortcutProviderGridTests
     // ---- FunctionShortcutProvider ----
 
     [Fact]
-    public void Function_Grid_IsFilterDisableEnableAndRefresh()
+    public void Function_Grid_IsFilterDisableEnableRefreshAndViewLogs()
     {
         // feat/function-disable-toggle: D toggles the selected function's disabled state.
         // feat/servicebus-trigger-insight: Refresh (R) re-fetches Service Bus message counts.
+        // feat/logs-refinements: Enter opens the selected function's Application Insights logs.
         var sut = new FunctionShortcutProvider();
         var grid = sut.Describe(new FunctionDetails { Name = "fn", FunctionAppName = "appA", Trigger = "t" });
-        Assert.Equal(3, grid.Count);
+        Assert.Equal(4, grid.Count);
         Assert.Equal(new ShortcutMap(ListPanelShortcuts.Filter, true), grid[new TableIndex(0, 2)]);
         Assert.Equal(new ShortcutMap(ListPanelShortcuts.DisableEnable, true), grid[new TableIndex(0, 3)]);
         Assert.Equal(new ShortcutMap(ListPanelShortcuts.Refresh, true), grid[new TableIndex(0, 4)]);
+        Assert.Equal(new ShortcutMap(ListPanelShortcuts.ViewLogs, true), grid[new TableIndex(1, 2)]);
     }
 
     [Theory]

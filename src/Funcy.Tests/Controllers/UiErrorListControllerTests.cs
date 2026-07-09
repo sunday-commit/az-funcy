@@ -90,6 +90,14 @@ public class UiErrorListControllerTests
         public void Upsert(UiErrorEntry item) => throw new NotSupportedException();
         public void Remove(string key) => throw new NotSupportedException();
         public void SetUiStatus(UiStatusSnapshot uiStatusSnapshot) { }
+        public void SetHeader(string header)
+        {
+            
+        }
+
+        public void SetEmptyStateMessage(string? message)
+        {
+        }
 
         public void HandleResize() { }
         public Panel Panel => new("");

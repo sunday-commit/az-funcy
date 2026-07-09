@@ -14,10 +14,11 @@ public sealed class LogQueryExecutor(LogsQueryClient client) : ILogQueryExecutor
         var resourceId = ResourceIdentifier.Parse(request.AppInsightsResourceId);
         var query = LogQueryBuilder.Build(request.FunctionAppName, request.FunctionName, request.Since, request.MaxRows);
 
-        // Bound the service-side scan: a wide window for the initial load, or just past the last
-        // seen timestamp for incremental polls. The KQL also carries the incremental predicate.
+        // Bound the service-side scan: the user-chosen lookback window for the initial load, or
+        // just past the last seen timestamp for incremental polls. The KQL also carries the
+        // incremental predicate.
         var end = DateTimeOffset.UtcNow.AddMinutes(1);
-        var start = request.Since ?? end.AddMinutes(-30);
+        var start = request.Since ?? end - request.Lookback;
         var timeRange = new QueryTimeRange(start, end);
 
         Response<LogsQueryResult> response = await client.QueryResourceAsync(

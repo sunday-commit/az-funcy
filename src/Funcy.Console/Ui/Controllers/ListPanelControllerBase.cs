@@ -10,6 +10,7 @@ public interface IListController : IDisposable
     // existing controllers (which react to shortcuts elsewhere) are unaffected.
     void Refresh();
     void ToggleTypeFilter();
+    void ToggleLookback();
 }
 
 public abstract class ListPanelControllerBase<T>(IListPanelView<T> view) : IListController
@@ -24,6 +25,7 @@ public abstract class ListPanelControllerBase<T>(IListPanelView<T> view) : IList
 
     public virtual void Refresh() { }
     public virtual void ToggleTypeFilter() { }
+    public virtual void ToggleLookback() { }
 
     public virtual void Dispose() { /* unhook events etc */ }
 }

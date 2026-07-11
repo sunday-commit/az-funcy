@@ -151,7 +151,8 @@ public class ListPanelViewBypassTests
             onAction: null,
             onActionNavigation: null,
             emptyStateMessage: null,
-            windowHeight: () => 30);
+            windowHeight: () => 30,
+            windowWidth: () => 120);
     }
 
     private sealed record OpItem(string Key, bool active) : IHasKey, IComparable<OpItem>, IOperationVisibility

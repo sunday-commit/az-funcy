@@ -101,14 +101,8 @@ public class TagSelectionControllerTests : IDisposable
         public void Upsert(TagChoice item) { }
         public void Remove(string key) { }
         public void SetUiStatus(UiStatusSnapshot uiStatusSnapshot) { }
-        public void SetHeader(string header)
-        {
-            
-        }
-
-        public void SetEmptyStateMessage(string? message)
-        {
-        }
+        public void SetHeader(string header) { }
+        public void SetEmptyStateMessage(string? message) { }
 
         public string GetSelectedItemKey() => SelectedKey;
 

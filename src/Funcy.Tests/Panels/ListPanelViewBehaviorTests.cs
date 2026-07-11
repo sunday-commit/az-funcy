@@ -332,7 +332,8 @@ public class ListPanelViewBehaviorTests
             onAction: null,
             onActionNavigation: onActionNavigation,
             emptyStateMessage: emptyStateMessage,
-            windowHeight: () => windowHeight);
+            windowHeight: () => windowHeight,
+            windowWidth: () => 120);
         view.SetAll(items);
         return view;
     }

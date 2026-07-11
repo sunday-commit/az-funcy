@@ -81,7 +81,8 @@ public class ListPanelViewTests
             onAction: null,
             onActionNavigation: null,
             emptyStateMessage: null,
-            windowHeight: () => 30);
+            windowHeight: () => 30,
+            windowWidth: () => 120);
     }
 
     private sealed record TestItem(string Key, string Value) : IHasKey, IComparable<TestItem>

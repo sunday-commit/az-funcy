@@ -15,7 +15,7 @@ public class AnimationHandler : IAnimationProvider
     private int _frameduration = 100;
     
     public string CurrentFrame => _frames[_frameIndex];
-    public string CurrentKey { get; set; }
+    public string CurrentKey { get; set; } = string.Empty;
     
     private readonly ConcurrentDictionary<string, string> _animatedFunctions = [];
     

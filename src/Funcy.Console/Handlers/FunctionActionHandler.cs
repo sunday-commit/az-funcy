@@ -73,6 +73,7 @@ public class FunctionActionHandler(
                     details.Functions = [];
                     break;
                 case FunctionAction.Swap:
+                    ArgumentNullException.ThrowIfNull(inputResult.SlotDetails);
                     await functionAppManagement.SwapFunction(details, inputResult.SlotDetails);
                     details = await functionService.GetFunctionAppDetails(details);
                     details.State = FunctionState.Running;

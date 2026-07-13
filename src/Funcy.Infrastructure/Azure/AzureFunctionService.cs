@@ -171,7 +171,7 @@ public class AzureFunctionService(
                 
                 await Task.WhenAll(tasks);
             }
-            catch (OperationCanceledException e)
+            catch (OperationCanceledException)
             {
                 logger.LogInformation("Operation cancelled");
             }

@@ -16,7 +16,7 @@ public class SubscriptionShortcutProvider(AppContext appContext) : IShortcutProv
         };
     }
 
-    public bool IsActionValid(SubscriptionDetails getSelectedItem, FunctionAction action)
+    public bool IsActionValid(SubscriptionDetails? getSelectedItem, FunctionAction action)
     {
         return action switch
         {

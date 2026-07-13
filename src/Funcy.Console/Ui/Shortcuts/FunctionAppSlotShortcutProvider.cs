@@ -18,7 +18,7 @@ public class FunctionAppSlotShortcutProvider : IShortcutProvider<FunctionAppSlot
         return shortcutList;
     }
 
-    public bool IsActionValid(FunctionAppSlotDetails getSelectedItem, FunctionAction action)
+    public bool IsActionValid(FunctionAppSlotDetails? getSelectedItem, FunctionAction action)
     {
         return action switch
         {

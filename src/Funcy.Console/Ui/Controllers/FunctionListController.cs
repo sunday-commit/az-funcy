@@ -1,5 +1,6 @@
 using Funcy.Console.Handlers.Concurrency;
 using Funcy.Console.Ui.Panels.Interfaces;
+using Funcy.Console.Ui.State;
 using Funcy.Core.Interfaces;
 using Funcy.Core.Model;
 using Microsoft.Extensions.Logging;
@@ -19,6 +20,7 @@ public sealed class FunctionListController : ListPanelControllerBase<FunctionDet
     private readonly ILogger<FunctionListController> _logger;
     private readonly Action? _invalidate;
     private readonly IUiStatusState _uiStatusState;
+    private readonly IUiErrorLog? _uiErrorLog;
     private readonly string _functionAppKey;
 
     private readonly Lock _countGate = new();
@@ -41,7 +43,8 @@ public sealed class FunctionListController : ListPanelControllerBase<FunctionDet
         IServiceBusInsightService insightService,
         ILogger<FunctionListController> logger,
         IUiStatusState uiStatusState,
-        Action? invalidate = null)
+        Action? invalidate = null,
+        IUiErrorLog? uiErrorLog = null)
         : base(view)
     {
         _coordinator = coordinator;
@@ -49,6 +52,7 @@ public sealed class FunctionListController : ListPanelControllerBase<FunctionDet
         _logger = logger;
         _invalidate = invalidate;
         _uiStatusState = uiStatusState;
+        _uiErrorLog = uiErrorLog;
         _functionAppKey = appKey;
 
         View.SetAll(OverlayResolvedNames(initial.ToList()));
@@ -118,6 +122,11 @@ public sealed class FunctionListController : ListPanelControllerBase<FunctionDet
                 }
 
                 var byKey = serviceBusFunctions.ToDictionary(f => f.Key);
+                var permissionError = results.Select(r => r.ErrorMessage).FirstOrDefault(m => m is not null);
+                if (permissionError is not null)
+                {
+                    _uiErrorLog?.Report(app.Name, permissionError);
+                }
                 foreach (var result in results)
                 {
                     if (!byKey.TryGetValue(result.FunctionKey, out var function))

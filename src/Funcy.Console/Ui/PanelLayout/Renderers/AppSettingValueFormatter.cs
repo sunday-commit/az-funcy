@@ -13,7 +13,6 @@ public static class AppSettingValueFormatter
     // Fixed length so a masked value never leaks the real value's length.
     public const string Mask = "••••••";
     public const string ResolvingText = "resolving…";
-    public const string AccessDeniedText = "⚠ access denied";
 
     private const int MaxValueLength = 52;
 
@@ -36,7 +35,8 @@ public static class AppSettingValueFormatter
             {
                 SecretResolutionState.Resolved => EscapedValue(item.ResolvedValue ?? string.Empty),
                 SecretResolutionState.Failed => new AppSettingValueCells(
-                    $"[{UiStyles.Danger}]{AccessDeniedText}[/]", AccessDeniedText),
+                    $"[{UiStyles.Danger}]{Markup.Escape(Truncate(item.ResolutionErrorMessage ?? "Could not resolve secret."))}[/]",
+                    Truncate(item.ResolutionErrorMessage ?? "Could not resolve secret.")),
                 _ => new AppSettingValueCells($"[{UiStyles.Hint}]{ResolvingText}[/]", ResolvingText)
             };
         }

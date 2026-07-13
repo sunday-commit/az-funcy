@@ -18,6 +18,7 @@ public class AppSettingDetails : IComparable<AppSettingDetails>, IHasKey
     // Resolved Key Vault secret value, cached for the panel's lifetime once fetched.
     public string? ResolvedValue { get; set; }
     public SecretResolutionState ResolutionState { get; set; } = SecretResolutionState.Pending;
+    public string? ResolutionErrorMessage { get; set; }
 
     // Transient "copied to clipboard" confirmation flag, cleared shortly after the copy.
     public bool JustCopied { get; set; }

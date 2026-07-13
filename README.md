@@ -14,6 +14,9 @@ It is built with **Spectre.Console** and inspired by tools like **btop** and **k
 - Swap deployment slots to production
 - Switch Azure subscriptions at runtime
 - Filter and sort large lists efficiently
+- View Function App environment variables and resolve Key Vault references on demand
+- View Application Insights logs for individual functions
+- View Service Bus active and dead-letter message counts
 - Fully keyboard-driven UI
 
 ---
@@ -51,10 +54,34 @@ You must be logged in via Azure CLI:
 az login
 ```
 
-Required permissions:
+### Azure permissions
 
-- **Read** access to list Function Apps (Resource Graph)
-- **Contributor** (or equivalent) to start/stop apps or swap slots
+az-funcy keeps optional capabilities visible when access is missing. An attempted operation that
+Azure rejects with `403 Forbidden` shows the required role in the UI; it does not remove the
+feature. Assign roles at the narrowest practical scope.
+
+For the main administration workflow, grant:
+
+- **Reader** on the subscriptions or resource groups that az-funcy should inventory.
+- **Website Contributor** on the Function Apps or their resource group to start and stop apps,
+  swap slots, enable or disable functions, and read application settings. The broader
+  **Contributor** role also works but is not required by az-funcy.
+
+Optional capabilities require additional access:
+
+| Capability | Minimum built-in role | Recommended scope | Behavior without access |
+|------------|-----------------------|-------------------|-------------------------|
+| List Function Apps and their resources | Reader | Subscription or resource group | Inventory refresh reports an authorization error |
+| Administer Function Apps and read environment variables | Website Contributor | Function App or resource group | The action remains available and reports the required role |
+| Read Service Bus queue/subscription message counts | Reader | Service Bus namespace or resource group | Functions remain visible; counts show as unavailable and the Issues view explains the requirement |
+| Resolve Key Vault secret values | Key Vault Secrets User | Key Vault | The reference remains visible and revealing it reports the required role |
+| Query Application Insights logs | Website Contributor plus Monitoring Reader | Function App plus Application Insights resource | The Logs view remains available and reports the required roles |
+| Query workspace-based logs when workspace permissions are enforced | Log Analytics Reader | Log Analytics workspace | The Logs view reports the additional workspace requirement |
+
+Service Bus counts use Azure Resource Manager metadata, so **Azure Service Bus Data Receiver** is
+not required. Key Vaults using access policies instead of Azure RBAC need an equivalent secret
+`Get` permission. Network rules and private endpoints can still prevent Key Vault access even when
+the role assignment is correct.
 
 ---
 
@@ -150,9 +177,7 @@ After switching, you always return to the Function Apps view.
 - Settings view
 - Favorites / pinned Function Apps
 - Hide functionality for subscriptions
-- Improved error surfacing in UI
 - Throttle refresh on subscription change (max once every 5 minutes)
-- View Service Bus message count
 
 ## License
 

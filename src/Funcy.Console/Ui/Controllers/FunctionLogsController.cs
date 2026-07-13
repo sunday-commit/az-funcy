@@ -2,6 +2,7 @@ using Funcy.Console.Ui.Panels.Interfaces;
 using Funcy.Core.Interfaces;
 using Funcy.Core.Model;
 using Spectre.Console;
+using Funcy.Infrastructure.Azure;
 
 namespace Funcy.Console.Ui.Controllers;
 
@@ -213,6 +214,12 @@ public sealed class FunctionLogsController : ListPanelControllerBase<LogEntryDet
         {
             // Dispose() raced the loop between cancellation and the next semaphore wait.
         }
+        catch (Exception e) when (AzurePermissionError.IsAccessDenied(e))
+        {
+            View.SetEmptyStateMessage(
+                $"[{UiStyles.Danger}]Could not resolve Application Insights due to missing access. Required: Website Contributor on the Function App and Reader access to its Azure resources.[/]");
+            _invalidate?.Invoke();
+        }
     }
 
     private async Task PollOnceAsync(string resourceId, CancellationToken cancellationToken)
@@ -263,6 +270,13 @@ public sealed class FunctionLogsController : ListPanelControllerBase<LogEntryDet
         catch (OperationCanceledException)
         {
             // Shutting down.
+        }
+        catch (Exception e) when (AzurePermissionError.IsAccessDenied(e))
+        {
+            spinnerCts?.Cancel();
+            View.SetEmptyStateMessage(
+                $"[{UiStyles.Danger}]Log query access denied. Required: Monitoring Reader on Application Insights and, when workspace access is required, Log Analytics Reader on the workspace.[/]");
+            _invalidate?.Invoke();
         }
         catch
         {

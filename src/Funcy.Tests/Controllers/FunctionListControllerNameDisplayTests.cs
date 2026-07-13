@@ -9,6 +9,7 @@ using Funcy.Console.Ui.PanelLayout.Renderers;
 using Funcy.Console.Ui.Pagination.Matchers;
 using Funcy.Console.Ui.Panels;
 using Funcy.Console.Ui.Shortcuts;
+using Funcy.Console.Ui.State;
 using Funcy.Core.Interfaces;
 using Funcy.Core.Model;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -102,6 +103,45 @@ public class FunctionListControllerNameDisplayTests
         {
             insight.ReleaseAll();
             controller.Dispose();
+        }
+    }
+
+    [Fact]
+    public async Task ServiceBusPermissionFailure_IsReportedWithoutHidingFunction()
+    {
+        var view = new ListPanelView<FunctionDetails>(new FunctionMatcher(), new FunctionLayoutRenderer(),
+            new NoShortcuts(), new NoAnimations(), null, "Functions", null, null, null, () => 30, () => 200);
+        var coordinator = new FunctionStateCoordinator();
+        coordinator.SetSubscription(Sub);
+        coordinator.InitCache([AppWithRawServiceBusFunction()]);
+        var insight = new GatedInsightService(f => new ServiceBusCountResult(f.Key, null, null, false,
+            ErrorMessage: "Service Bus counts access denied. Required: Reader on the Service Bus namespace."));
+        var errors = new UiErrorLog();
+        var controller = new FunctionListController(view, AppName, coordinator.TryGet(AppName)!.Functions,
+            coordinator, insight, NullLogger<FunctionListController>.Instance, new NoopUiStatusState(),
+            uiErrorLog: errors);
+
+        try
+        {
+            var call = await insight.NextCallAsync();
+            call.Release();
+            await WaitUntilAsync(() => errors.Count == 1);
+
+            Assert.Contains("Reader on the Service Bus namespace", Assert.Single(errors.GetSnapshot()).Message);
+            Assert.Equal("ProcessOrders", Assert.Single(coordinator.TryGet(AppName)!.Functions).Name);
+        }
+        finally
+        {
+            controller.Dispose();
+        }
+    }
+
+    private static async Task WaitUntilAsync(Func<bool> condition)
+    {
+        using var timeout = new CancellationTokenSource(Timeout);
+        while (!condition())
+        {
+            await Task.Delay(10, timeout.Token);
         }
     }
 

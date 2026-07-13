@@ -10,14 +10,16 @@ public class AppSettingValueFormatterTests
     private static AppSettingDetails Plain(string value) =>
         new() { Name = "S", Value = value };
 
-    private static AppSettingDetails KeyVault(SecretResolutionState state, string? resolved = null) =>
+    private static AppSettingDetails KeyVault(SecretResolutionState state, string? resolved = null,
+        string? resolutionError = null) =>
         new()
         {
             Name = "S",
             Value = "ref",
             KeyVaultReference = new KeyVaultReference("vault", new Uri("https://vault.vault.azure.net"), "s", null),
             ResolutionState = state,
-            ResolvedValue = resolved
+            ResolvedValue = resolved,
+            ResolutionErrorMessage = resolutionError
         };
 
     [Fact]
@@ -74,15 +76,27 @@ public class AppSettingValueFormatterTests
     }
 
     [Fact]
-    public void Format_UnmaskedFailed_ShowsStyledError()
+    public void Format_UnmaskedFailed_ShowsSpecificError()
     {
-        var item = KeyVault(SecretResolutionState.Failed);
+        var item = KeyVault(SecretResolutionState.Failed, resolutionError: "Access denied. Required: Key Vault Secrets User.");
         item.Masked = false;
 
         var cells = AppSettingValueFormatter.Format(item);
 
-        Assert.Contains(AppSettingValueFormatter.AccessDeniedText, cells.Unselected);
+        Assert.Contains("Key Vault Secrets User", cells.Unselected);
         Assert.Contains(UiStyles.Danger, cells.Unselected);
+    }
+
+    [Fact]
+    public void Format_UnmaskedGenericFailure_DoesNotClaimAccessWasDenied()
+    {
+        var item = KeyVault(SecretResolutionState.Failed, resolutionError: "Could not resolve secret.");
+        item.Masked = false;
+
+        var cells = AppSettingValueFormatter.Format(item);
+
+        Assert.Contains("Could not resolve secret", cells.Unselected);
+        Assert.DoesNotContain("access denied", cells.Unselected, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

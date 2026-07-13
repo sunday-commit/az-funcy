@@ -5,6 +5,7 @@ using Funcy.Console.Ui.State;
 using Funcy.Core.Interfaces;
 using Funcy.Core.Model;
 using Funcy.Infrastructure.Azure;
+using Azure;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -97,6 +98,20 @@ public class FunctionActionHandlerErrorTests
 
         // Cancellations are not real failures -> nothing surfaced. (The OCE path never calls Report.)
         Assert.Equal(0, errorLog.Count);
+    }
+
+    [Fact]
+    public async Task ExecuteAction_WhenAccessIsDenied_ExplainsRequiredPermission()
+    {
+        var errorLog = new UiErrorLog();
+        var (handler, _) = BuildHandler(new FakeManagement(new RequestFailedException(403, "Forbidden")), errorLog);
+        var reported = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        errorLog.Changed += () => reported.TrySetResult();
+
+        await handler.Dispatch(new InputActionResult(FunctionAction.Stop, MakeApp("app-a")));
+        await reported.Task.WaitAsync(Timeout);
+
+        Assert.Contains("Website Contributor", Assert.Single(errorLog.GetSnapshot()).Message);
     }
 
     private sealed class FakeManagement(Exception toThrow) : IFunctionAppManagementService

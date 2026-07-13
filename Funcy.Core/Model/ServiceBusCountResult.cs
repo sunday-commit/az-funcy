@@ -15,4 +15,5 @@ public sealed record ServiceBusCountResult(
     string? SubscriptionName = null,
     // ARM id of the namespace the counts were resolved against, so the caller can persist it and
     // skip the resolution next time. Null when the namespace could not be resolved.
-    string? NamespaceId = null);
+    string? NamespaceId = null,
+    string? ErrorMessage = null);

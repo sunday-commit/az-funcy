@@ -1,4 +1,5 @@
 using Funcy.Infrastructure.Azure;
+using Azure;
 using Xunit;
 
 namespace Funcy.Tests.Azure;
@@ -51,6 +52,22 @@ public class AppInsightsResolverTests
         Assert.Equal("resource-id", first);
         Assert.Equal("resource-id", second);
         Assert.Equal(1, lookup.CallCount);
+    }
+
+    [Fact]
+    public async Task ResolveResourceIdAsync_WhenAccessIsDenied_PropagatesAndRetries()
+    {
+        var lookup = new SequenceLookup(
+            _ => throw new RequestFailedException(403, "Forbidden"),
+            _ => Task.FromResult<string?>("resource-id"));
+        var resolver = new AppInsightsResolver(lookup);
+
+        await Assert.ThrowsAsync<RequestFailedException>(
+            () => resolver.ResolveResourceIdAsync("app-id", CancellationToken.None));
+        var result = await resolver.ResolveResourceIdAsync("app-id", CancellationToken.None);
+
+        Assert.Equal("resource-id", result);
+        Assert.Equal(2, lookup.CallCount);
     }
 
     private sealed class SequenceLookup(params Func<CancellationToken, Task<string?>>[] results)

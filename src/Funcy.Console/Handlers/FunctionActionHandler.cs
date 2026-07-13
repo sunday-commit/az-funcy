@@ -92,7 +92,11 @@ public class FunctionActionHandler(
             await functionStatusManager.CompleteOperation(details, inputResult.Action, false);
             if (ex is not OperationCanceledException)
             {
-                uiErrorLog.Report(details.Name, $"{inputResult.Action} failed: {ex.Message}");
+                var message = AzurePermissionError.IsAccessDenied(ex)
+                    ? AzurePermissionError.Required(inputResult.Action.ToString(),
+                        "Website Contributor on the Function App")
+                    : $"{inputResult.Action} failed: {ex.Message}";
+                uiErrorLog.Report(details.Name, message);
             }
         }
         finally
@@ -134,7 +138,12 @@ public class FunctionActionHandler(
             function.IsDisabled = !target; // revert on failure
             if (e is not OperationCanceledException)
             {
-                uiErrorLog.Report(app.Name, $"{(target ? "Disable" : "Enable")} {function.Name} failed: {e.Message}");
+                var action = target ? "Disable" : "Enable";
+                var message = AzurePermissionError.IsAccessDenied(e)
+                    ? AzurePermissionError.Required($"{action} {function.Name}",
+                        "Website Contributor on the Function App")
+                    : $"{action} {function.Name} failed: {e.Message}";
+                uiErrorLog.Report(app.Name, message);
             }
         }
         finally

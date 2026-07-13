@@ -12,6 +12,10 @@ public record GraphQueryResponse(
 
 public record FunctionAppGraphRow(string Id, string Name, string State, Dictionary<string, string> Tags, string ResourceGroup, string SubscriptionId);
 
-public record NamespaceGraphResponse(int Count, List<NamespaceGraphRow> Data);
+public record NamespaceGraphResponse(
+    int Count,
+    List<NamespaceGraphRow> Data,
+    [property: JsonPropertyName("skip_token")]
+    string? SkipToken);
 
 public record NamespaceGraphRow(string Id, string Name);

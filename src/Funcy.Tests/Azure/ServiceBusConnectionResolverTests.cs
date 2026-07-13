@@ -63,6 +63,15 @@ public class ServiceBusConnectionResolverTests
     }
 
     [Fact]
+    public void ResolveNamespace_KeyVaultReference_ReturnsNullWithoutResolvingSecret()
+    {
+        var resolver = Resolver(("MyConn",
+            "@Microsoft.KeyVault(SecretUri=https://vault.vault.azure.net/secrets/service-bus/)"));
+
+        Assert.Null(resolver.ResolveNamespace("MyConn"));
+    }
+
+    [Fact]
     public void ResolveValue_PercentPlaceholder_ResolvesEntityName()
     {
         var resolver = Resolver(("QueueSetting", "real-queue"));

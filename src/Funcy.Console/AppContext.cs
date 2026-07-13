@@ -2,6 +2,7 @@ using Funcy.Core.Model;
 using Funcy.Data;
 using Funcy.Data.Entities;
 using Funcy.Infrastructure.Azure;
+using Funcy.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -10,7 +11,8 @@ namespace Funcy.Console;
 public class AppContext(
     AzureSubscriptionService azureSubscriptionService,
     IDbContextFactory<FunctionAppDbContext> dbFactory,
-    ILogger<AppContext> logger)
+    ILogger<AppContext> logger,
+    DatabaseWriteCoordinator databaseWrites)
 {
     private SubscriptionDetails? _currentSubscription;
     public SubscriptionDetails CurrentSubscription =>
@@ -53,17 +55,20 @@ public class AppContext(
         var name = CachedSubscriptions.Values
             .FirstOrDefault(s => s.Id == subscriptionId)?.Name ?? subscriptionId;
         logger.LogInformation("Probed '{Name}': {Result}", name, hasApps ? "has function apps" : "no function apps");
-        await using var db = await dbFactory.CreateDbContextAsync();
-        if (!await db.SubscriptionSettings.AnyAsync(s => s.SubscriptionId == subscriptionId))
+        await databaseWrites.ExecuteAsync(async () =>
         {
-            db.SubscriptionSettings.Add(new SubscriptionSetting
+            await using var db = await dbFactory.CreateDbContextAsync();
+            if (!await db.SubscriptionSettings.AnyAsync(s => s.SubscriptionId == subscriptionId))
             {
-                SubscriptionId = subscriptionId,
-                Name = name,
-                IsHidden = isHidden
-            });
-            await db.SaveChangesAsync();
-        }
+                db.SubscriptionSettings.Add(new SubscriptionSetting
+                {
+                    SubscriptionId = subscriptionId,
+                    Name = name,
+                    IsHidden = isHidden
+                });
+                await db.SaveChangesAsync();
+            }
+        });
     }
 
     public void ToggleSubscriptionVisibility(string subscriptionId)
@@ -78,22 +83,25 @@ public class AppContext(
         var name = CachedSubscriptions.Values
             .FirstOrDefault(s => s.Id == subscriptionId)?.Name ?? subscriptionId;
 
-        await using var db = await dbFactory.CreateDbContextAsync();
-        var existing = await db.SubscriptionSettings.FindAsync(subscriptionId);
-        if (existing != null)
+        await databaseWrites.ExecuteAsync(async () =>
         {
-            existing.IsHidden = isHidden;
-        }
-        else
-        {
-            db.SubscriptionSettings.Add(new SubscriptionSetting
+            await using var db = await dbFactory.CreateDbContextAsync();
+            var existing = await db.SubscriptionSettings.FindAsync(subscriptionId);
+            if (existing != null)
             {
-                SubscriptionId = subscriptionId,
-                Name = name,
-                IsHidden = isHidden
-            });
-        }
-        await db.SaveChangesAsync();
+                existing.IsHidden = isHidden;
+            }
+            else
+            {
+                db.SubscriptionSettings.Add(new SubscriptionSetting
+                {
+                    SubscriptionId = subscriptionId,
+                    Name = name,
+                    IsHidden = isHidden
+                });
+            }
+            await db.SaveChangesAsync();
+        });
     }
 
     private void SetCachedSubscriptions(List<SubscriptionDetails> subscriptions)

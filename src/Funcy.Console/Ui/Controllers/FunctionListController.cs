@@ -127,9 +127,11 @@ public sealed class FunctionListController : ListPanelControllerBase<FunctionDet
 
                     function.ActiveMessages = result.ActiveMessages;
                     function.DeadLetteredMessages = result.DeadLetteredMessages;
-                    // Cache the resolved namespace on the model so a repeat fetch in this view skips
-                    // resolution; the app-list sync is what persists it to SQLite.
-                    if (string.IsNullOrEmpty(function.ServiceBusNamespaceId) && !string.IsNullOrEmpty(result.NamespaceId))
+                    // Cache first-time resolutions and configuration-driven namespace changes on the
+                    // model; the app-list sync persists them to SQLite.
+                    if (!string.IsNullOrEmpty(result.NamespaceId)
+                        && !string.Equals(function.ServiceBusNamespaceId, result.NamespaceId,
+                            StringComparison.OrdinalIgnoreCase))
                     {
                         function.ServiceBusNamespaceId = result.NamespaceId;
                     }

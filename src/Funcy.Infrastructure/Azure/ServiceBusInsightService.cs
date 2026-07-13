@@ -20,6 +20,10 @@ public class ServiceBusInsightService(
     // not the value, so concurrent apps in the same subscription share a single graph query.
     private readonly ConcurrentDictionary<string, Task<IReadOnlyList<(string Id, string Name)>>> _namespacesBySubscription = new();
 
+    // One application-settings fetch per app and process. This is enough to validate a persisted
+    // namespace without repeating the expensive namespace/entity probe on every count refresh.
+    private readonly ConcurrentDictionary<string, Task<ServiceBusConnectionResolver?>> _resolversByApp = new();
+
     // Active + dead-letter message counts for one Service Bus entity.
     private readonly record struct CountDetails(long Active, long DeadLetter);
 
@@ -34,19 +38,7 @@ public class ServiceBusInsightService(
             return results;
         }
 
-        // Only pay for the app settings fetch when something still needs resolving: a namespace not
-        // yet cached (may need the connection string / Key Vault) or a %SettingName% binding name.
-        var needSettings = serviceBusFunctions.Any(f =>
-            string.IsNullOrEmpty(f.ServiceBusNamespaceId)
-            || HasPlaceholder(f.QueueName)
-            || HasPlaceholder(f.TopicName)
-            || HasPlaceholder(f.SubscriptionName));
-
-        ServiceBusConnectionResolver? resolver = null;
-        if (needSettings)
-        {
-            resolver = await TryBuildResolverAsync(functionAppArmId, cancellationToken);
-        }
+        var resolver = await GetResolverAsync(functionAppArmId, cancellationToken);
 
         foreach (var function in serviceBusFunctions)
         {
@@ -79,14 +71,19 @@ public class ServiceBusInsightService(
 
         try
         {
-            // Namespace already resolved once and cached (in SQLite): query it directly and never
-            // re-resolve — reconfiguring an app to a different namespace is handled by clearing the
-            // cache, not by re-probing on every refresh.
-            if (!string.IsNullOrEmpty(function.ServiceBusNamespaceId))
+            // Validate the persisted namespace against an inline connection string or identity-based
+            // fullyQualifiedNamespace setting. When they agree, this remains a single direct count GET.
+            // Key Vault references cannot be validated cheaply and retain the persisted fast path.
+            var configuredNamespace = resolver?.ResolveNamespace(function.ConnectionSetting);
+            var cachedNamespaceId = SelectCachedNamespaceId(function.ServiceBusNamespaceId, configuredNamespace);
+            if (!string.IsNullOrEmpty(cachedNamespaceId))
             {
                 var counts = await TryGetCountDetailsAsync(
-                    function.ServiceBusNamespaceId, queueName, topicName, subscriptionName, cancellationToken);
-                return ToResult(function, counts, function.ServiceBusNamespaceId, queueName, topicName, subscriptionName);
+                    cachedNamespaceId, queueName, topicName, subscriptionName, cancellationToken);
+                if (counts is not null || !string.IsNullOrEmpty(configuredNamespace))
+                {
+                    return ToResult(function, counts, cachedNamespaceId, queueName, topicName, subscriptionName);
+                }
             }
 
             var (namespaceId, resolvedCounts) = await ResolveNamespaceAndFetchAsync(
@@ -127,7 +124,26 @@ public class ServiceBusInsightService(
         string? queueName, string? topicName, string? subscriptionName, CancellationToken cancellationToken)
     {
         var subscriptionId = new ResourceIdentifier(functionAppArmId).SubscriptionId!;
-        var candidates = await GetCandidateNamespacesAsync(subscriptionId);
+
+        // Prefer the authoritative connection setting. This costs at most one Resource Graph lookup
+        // and one direct entity GET, and avoids scanning every namespace when the cache was invalidated.
+        var namespaceName = await ResolveNamespaceNameAsync(function.ConnectionSetting, resolver, cancellationToken);
+        if (!string.IsNullOrEmpty(namespaceName))
+        {
+            var namespaceId = await resourceService.GetServiceBusNamespaceIdAsync(namespaceName, cancellationToken);
+            if (!string.IsNullOrEmpty(namespaceId))
+            {
+                var counts = await TryGetCountDetailsAsync(
+                    namespaceId, queueName, topicName, subscriptionName, cancellationToken);
+                return (namespaceId, counts);
+            }
+
+            // The connection setting is authoritative. Do not return counts from an old namespace
+            // merely because an entity with the same name happens to exist there.
+            return (null, null);
+        }
+
+        var candidates = await GetCandidateNamespacesAsync(subscriptionId, cancellationToken);
 
         var matches = new List<(string Id, CountDetails Counts)>();
         foreach (var ns in candidates)
@@ -144,29 +160,18 @@ public class ServiceBusInsightService(
             return (matches[0].Id, matches[0].Counts);
         }
 
-        // 0 or >1 matches: use the connection string's authoritative namespace name (Key Vault read
-        // only when the connection is a reference) to disambiguate or reach a cross-subscription one.
-        var namespaceName = await ResolveNamespaceNameAsync(function.ConnectionSetting, resolver, cancellationToken);
-        if (!string.IsNullOrEmpty(namespaceName))
-        {
-            var named = candidates.FirstOrDefault(c => string.Equals(c.Name, namespaceName, StringComparison.OrdinalIgnoreCase));
-            var namespaceId = named.Id ?? await resourceService.GetServiceBusNamespaceIdAsync(namespaceName);
-            if (!string.IsNullOrEmpty(namespaceId))
-            {
-                var counts = await TryGetCountDetailsAsync(namespaceId, queueName, topicName, subscriptionName, cancellationToken);
-                return (namespaceId, counts);
-            }
-        }
-
         // Ambiguous with no authoritative name: fall back to the first probe hit if there was one.
         return matches.Count > 0 ? (matches[0].Id, matches[0].Counts) : (null, null);
     }
 
     // The subscription's namespaces, cached so concurrent apps share one graph query. A faulted
     // lookup is evicted so a transient graph failure does not poison the cache for the session.
-    private async Task<IReadOnlyList<(string Id, string Name)>> GetCandidateNamespacesAsync(string subscriptionId)
+    private async Task<IReadOnlyList<(string Id, string Name)>> GetCandidateNamespacesAsync(
+        string subscriptionId,
+        CancellationToken cancellationToken)
     {
-        var task = _namespacesBySubscription.GetOrAdd(subscriptionId, resourceService.GetServiceBusNamespacesAsync);
+        var task = _namespacesBySubscription.GetOrAdd(subscriptionId,
+            id => resourceService.GetServiceBusNamespacesAsync(id, cancellationToken));
         try
         {
             return await task;
@@ -263,6 +268,37 @@ public class ServiceBusInsightService(
             logger.LogError(e, "Failed to fetch application settings for {FunctionApp}", functionAppArmId);
             return null;
         }
+    }
+
+    private async Task<ServiceBusConnectionResolver?> GetResolverAsync(
+        string functionAppArmId,
+        CancellationToken cancellationToken)
+    {
+        var task = _resolversByApp.GetOrAdd(functionAppArmId,
+            id => TryBuildResolverAsync(id, cancellationToken));
+        try
+        {
+            return await task;
+        }
+        catch
+        {
+            _resolversByApp.TryRemove(
+                new KeyValuePair<string, Task<ServiceBusConnectionResolver?>>(functionAppArmId, task));
+            throw;
+        }
+    }
+
+    public static string? SelectCachedNamespaceId(string? cachedNamespaceId, string? configuredNamespace)
+    {
+        if (string.IsNullOrEmpty(cachedNamespaceId) || string.IsNullOrEmpty(configuredNamespace))
+        {
+            return cachedNamespaceId;
+        }
+
+        var cachedName = new ResourceIdentifier(cachedNamespaceId).Name;
+        return string.Equals(cachedName, configuredNamespace, StringComparison.OrdinalIgnoreCase)
+            ? cachedNamespaceId
+            : null;
     }
 
     // Resolves a function's %SettingName% binding names against the app settings the resolver wraps.

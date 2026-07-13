@@ -8,12 +8,16 @@ using Funcy.Core.Interfaces;
 using Funcy.Core.Model;
 using Funcy.Data;
 using Funcy.Data.Entities;
+using Funcy.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace Funcy.Infrastructure.Azure;
 
-public class FunctionAppManagementService(ILogger<FunctionAppManagementService> logger, IDbContextFactory<FunctionAppDbContext> dbContextFactory) : IFunctionAppManagementService
+public class FunctionAppManagementService(
+    ILogger<FunctionAppManagementService> logger,
+    IDbContextFactory<FunctionAppDbContext> dbContextFactory,
+    DatabaseWriteCoordinator databaseWrites) : IFunctionAppManagementService
 {
     private readonly ArmClient _client = new(new DefaultAzureCredential());
     
@@ -76,38 +80,44 @@ public class FunctionAppManagementService(ILogger<FunctionAppManagementService> 
 
     private async Task UpdateFunctionDisabledState(FunctionAppDetails functionAppDetails, string functionName, bool disabled)
     {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync();
-
-        var existing = await dbContext.FunctionApps
-            .Include(f => f.Functions)
-            .FirstOrDefaultAsync(f =>
-                f.Name == functionAppDetails.Name && f.ResourceGroup == functionAppDetails.ResourceGroup &&
-                f.Subscription == functionAppDetails.Subscription);
-
-        var function = existing?.Functions.FirstOrDefault(fn => fn.Name == functionName);
-        if (function is not null)
+        await databaseWrites.ExecuteAsync(async () =>
         {
-            function.IsDisabled = disabled;
-            await dbContext.SaveChangesAsync();
-        }
+            await using var dbContext = await dbContextFactory.CreateDbContextAsync();
+
+            var existing = await dbContext.FunctionApps
+                .Include(f => f.Functions)
+                .FirstOrDefaultAsync(f =>
+                    f.Name == functionAppDetails.Name && f.ResourceGroup == functionAppDetails.ResourceGroup &&
+                    f.Subscription == functionAppDetails.Subscription);
+
+            var function = existing?.Functions.FirstOrDefault(fn => fn.Name == functionName);
+            if (function is not null)
+            {
+                function.IsDisabled = disabled;
+                await dbContext.SaveChangesAsync();
+            }
+        });
     }
 
     private async Task UpdateFunctionApp(FunctionAppDetails functionAppDetails, FunctionState state)
     {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync();
-
-        var existing = await dbContext.FunctionApps
-            .Include(f => f.Functions)
-            .FirstOrDefaultAsync(f =>
-                f.Name == functionAppDetails.Name && f.ResourceGroup == functionAppDetails.ResourceGroup &&
-                f.Subscription == functionAppDetails.Subscription);
-        
-        if (existing is not null)
+        await databaseWrites.ExecuteAsync(async () =>
         {
-            existing.State = state;
-            existing.UpdatedAt = DateTime.UtcNow;
-            functionAppDetails.LastUpdated = existing.UpdatedAt;
-            await dbContext.SaveChangesAsync();
-        }
+            await using var dbContext = await dbContextFactory.CreateDbContextAsync();
+
+            var existing = await dbContext.FunctionApps
+                .Include(f => f.Functions)
+                .FirstOrDefaultAsync(f =>
+                    f.Name == functionAppDetails.Name && f.ResourceGroup == functionAppDetails.ResourceGroup &&
+                    f.Subscription == functionAppDetails.Subscription);
+
+            if (existing is not null)
+            {
+                existing.State = state;
+                existing.UpdatedAt = DateTime.UtcNow;
+                functionAppDetails.LastUpdated = existing.UpdatedAt;
+                await dbContext.SaveChangesAsync();
+            }
+        });
     }
 }

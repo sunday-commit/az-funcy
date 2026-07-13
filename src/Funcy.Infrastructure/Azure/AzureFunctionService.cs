@@ -11,6 +11,7 @@ using Funcy.Core.Model;
 using Funcy.Data;
 using Funcy.Data.Entities;
 using Funcy.Infrastructure.Azure.Models;
+using Funcy.Infrastructure.Data;
 using Funcy.Infrastructure.Mappers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -21,10 +22,9 @@ public class AzureFunctionService(
     ILogger<AzureFunctionService> logger,
     IAzureResourceService resourceService,
     ArmClient client,
-    IDbContextFactory<FunctionAppDbContext> dbContextFactory) : IAzureFunctionService
+    IDbContextFactory<FunctionAppDbContext> dbContextFactory,
+    DatabaseWriteCoordinator databaseWrites) : IAzureFunctionService
 {
-    private static readonly SemaphoreSlim DbWriteLock = new(1, 1);
-    
     public async Task<List<FunctionAppDetails>> GetFunctionsFromDatabase(string subscriptionId)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync();
@@ -41,24 +41,11 @@ public class AzureFunctionService(
         var stopwatch = new Stopwatch();
         stopwatch.Start();
         var channel = Channel.CreateUnbounded<FunctionAppFetchResult>();
-        var allFunctionApps = await resourceService.GetAllFunctionApps(subscriptionId);
+        var allFunctionApps = await resourceService.GetAllFunctionApps(subscriptionId, cancellationToken);
         
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-
-        var cleanupTask = CleanUpFunctionApps(subscriptionId, allFunctionApps, cancellationToken);
-
-        // Lock database access to prevent concurrent writes from multiple subscriptions
-        // Use a timeout to allow cancelled operations to complete first
-        var lockAcquired = await DbWriteLock.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
-        
-        if (!lockAcquired)
+        await databaseWrites.ExecuteAsync(async () =>
         {
-            logger.LogWarning("Could not acquire database write lock within timeout for subscription {SubscriptionId}", subscriptionId);
-            throw new TimeoutException("Database write lock could not be acquired - another synchronization is still running");
-        }
-        
-        try
-        {
+            await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
             var existingApps = await dbContext.FunctionApps
                 .Include(f => f.Tags)
                 .Where(f => f.Subscription == subscriptionId)
@@ -76,14 +63,20 @@ public class AzureFunctionService(
                     cancellationToken);
             }
 
+            var azureIds = allFunctionApps.Select(f => f.Id).ToHashSet();
+            var toRemove = await dbContext.FunctionApps
+                .Where(f => f.Subscription == subscriptionId && !azureIds.Contains(f.AzureId))
+                .ToListAsync(cancellationToken);
+
+            if (toRemove.Count > 0)
+            {
+                dbContext.FunctionApps.RemoveRange(toRemove);
+                logger.LogInformation("Removed {Count} function apps that no longer exist", toRemove.Count);
+            }
+
             await dbContext.SaveChangesAsync(cancellationToken);
-        }
-        finally
-        {
-            DbWriteLock.Release();
-        }
-        
-        await cleanupTask;
+        }, cancellationToken);
+
         channel.Writer.Complete();
 
         
@@ -98,22 +91,6 @@ public class AzureFunctionService(
         stopwatch.Stop();
         logger.LogInformation("Fetched all function app details in {ElapsedMilliseconds}ms",
             stopwatch.ElapsedMilliseconds);
-    }
-
-    private async Task CleanUpFunctionApps(string subscriptionId, List<FunctionAppGraphRow> allFunctionApps, CancellationToken cancellationToken)
-    {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        var azureIds = allFunctionApps.Select(f => f.Id).ToHashSet();
-        var toRemove = await dbContext.FunctionApps
-            .Where(f => f.Subscription == subscriptionId && !azureIds.Contains(f.AzureId))
-            .ToListAsync(cancellationToken);
-
-        if (toRemove.Any())
-        {
-            dbContext.FunctionApps.RemoveRange(toRemove);
-            await dbContext.SaveChangesAsync(cancellationToken);
-            logger.LogInformation("Removed {Count} function apps that no longer exist", toRemove.Count);
-        }
     }
 
     public async IAsyncEnumerable<FunctionAppFetchResult> GetFunctionAppFunctionsAndSlotsAsync(
@@ -197,13 +174,6 @@ public class AzureFunctionService(
         }
 
         var sw = Stopwatch.StartNew();
-        var dbContext = await dbContextFactory.CreateDbContextAsync();
-        var existing = await dbContext.FunctionApps
-            .Include(f => f.Functions)
-            .Include(f => f.Slots)
-            .Include(f => f.Tags)
-            .FirstAsync(f => f.AzureId == functionAppDetails.Id);
-
         var webSiteResource = client.GetWebSiteResource(ResourceIdentifier.Parse(functionAppDetails.Id));
 
         var functionTask = Task.Run(() =>
@@ -211,37 +181,48 @@ public class AzureFunctionService(
         var slotTask = Task.Run(() => FetchSlotListAsync(webSiteResource, functionAppDetails.Name));
         await Task.WhenAll(functionTask, slotTask);
 
-        if (functionTask.Result is not null)
+        var updated = await databaseWrites.ExecuteAsync(async () =>
         {
-            // Carry over the resolved Service Bus namespace (a once-only lookup) onto the freshly
-            // fetched rows so replacing the functions on a refresh does not wipe the cached id.
-            var namespaceByName = existing.Functions
-                .Where(f => !string.IsNullOrEmpty(f.ServiceBusNamespaceId))
-                .ToDictionary(f => f.Name, f => f.ServiceBusNamespaceId);
-            foreach (var fetched in functionTask.Result)
+            await using var dbContext = await dbContextFactory.CreateDbContextAsync();
+            var existing = await dbContext.FunctionApps
+                .Include(f => f.Functions)
+                .Include(f => f.Slots)
+                .Include(f => f.Tags)
+                .FirstAsync(f => f.AzureId == functionAppDetails.Id);
+
+            if (functionTask.Result is not null)
             {
-                if (namespaceByName.TryGetValue(fetched.Name, out var namespaceId))
+                // Carry over the resolved Service Bus namespace onto freshly fetched rows. The
+                // count service validates it against the connection setting before using it.
+                var namespaceByName = existing.Functions
+                    .Where(f => !string.IsNullOrEmpty(f.ServiceBusNamespaceId))
+                    .ToDictionary(f => f.Name, f => f.ServiceBusNamespaceId);
+                foreach (var fetched in functionTask.Result)
                 {
-                    fetched.ServiceBusNamespaceId = namespaceId;
+                    if (namespaceByName.TryGetValue(fetched.Name, out var namespaceId))
+                    {
+                        fetched.ServiceBusNamespaceId = namespaceId;
+                    }
                 }
+
+                dbContext.Functions.RemoveRange(existing.Functions);
+                existing.Functions = functionTask.Result;
             }
 
-            dbContext.Functions.RemoveRange(existing.Functions);
-            existing.Functions = functionTask.Result;
-        }
+            if (slotTask.Result is not null)
+            {
+                dbContext.FunctionAppSlots.RemoveRange(existing.Slots);
+                existing.Slots = slotTask.Result;
+            }
 
-        if (slotTask.Result is not null)
-        {
-            dbContext.FunctionAppSlots.RemoveRange(existing.Slots);
-            existing.Slots = slotTask.Result;
-        }
-
-        await dbContext.SaveChangesAsync();
+            await dbContext.SaveChangesAsync();
+            return existing.Map();
+        });
 
         sw.Stop();
         logger.LogInformation("Fetched all function app details in {ElapsedMilliseconds}ms", sw.ElapsedMilliseconds);
 
-        return existing.Map();
+        return updated;
     }
 
     private List<Function>? FetchFunctionListAsync(WebSiteResource webSiteResource, string functionAppName,
@@ -363,15 +344,18 @@ public class AzureFunctionService(
     // inventory sync (which never modifies IsPinned) cannot overwrite it.
     public async Task SetPinnedAsync(string azureId, bool isPinned)
     {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync();
-        var functionApp = await dbContext.FunctionApps.FirstOrDefaultAsync(f => f.AzureId == azureId);
-        if (functionApp is null)
+        await databaseWrites.ExecuteAsync(async () =>
         {
-            return;
-        }
+            await using var dbContext = await dbContextFactory.CreateDbContextAsync();
+            var functionApp = await dbContext.FunctionApps.FirstOrDefaultAsync(f => f.AzureId == azureId);
+            if (functionApp is null)
+            {
+                return;
+            }
 
-        functionApp.IsPinned = isPinned;
-        await dbContext.SaveChangesAsync();
+            functionApp.IsPinned = isPinned;
+            await dbContext.SaveChangesAsync();
+        });
     }
 
     public async Task SaveServiceBusNamespacesAsync(string functionAppArmId,
@@ -382,16 +366,7 @@ public class AzureFunctionService(
             return;
         }
 
-        // Serialized behind the same lock as the inventory/detail writes so we never race SQLite's
-        // single writer. Only the namespace column is touched.
-        if (!await DbWriteLock.WaitAsync(TimeSpan.FromSeconds(5)))
-        {
-            logger.LogWarning("Could not acquire database write lock to persist Service Bus namespaces for {App}",
-                functionAppArmId);
-            return;
-        }
-
-        try
+        await databaseWrites.ExecuteAsync(async () =>
         {
             await using var dbContext = await dbContextFactory.CreateDbContextAsync();
             var functions = await dbContext.Functions
@@ -408,10 +383,6 @@ public class AzureFunctionService(
             }
 
             await dbContext.SaveChangesAsync();
-        }
-        finally
-        {
-            DbWriteLock.Release();
-        }
+        });
     }
 }

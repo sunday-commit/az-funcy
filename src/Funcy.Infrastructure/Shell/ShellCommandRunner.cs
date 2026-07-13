@@ -2,10 +2,23 @@ namespace Funcy.Infrastructure.Shell;
 
 using System.Diagnostics;
 
-public static class ShellCommandRunner
+public interface IShellCommandRunner
 {
-    public static async Task<string> RunAsync(string command, string arguments)
+    Task<string> RunAsync(string command, string arguments, CancellationToken cancellationToken = default);
+}
+
+public sealed class ShellCommandRunner(TimeSpan? timeout = null) : IShellCommandRunner
+{
+    private static readonly TimeSpan DefaultTimeout = TimeSpan.FromMinutes(1);
+    private readonly TimeSpan _timeout = timeout ?? DefaultTimeout;
+
+    public async Task<string> RunAsync(
+        string command,
+        string arguments,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         var psi = new ProcessStartInfo
         {
             FileName = GetShellExecutable(command),
@@ -16,15 +29,34 @@ public static class ShellCommandRunner
             CreateNoWindow = true
         };
 
-        using var process = new Process();
-        process.StartInfo = psi;
+        using var process = new Process { StartInfo = psi };
+        using var timeoutCts = new CancellationTokenSource(_timeout);
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken, timeoutCts.Token);
 
         process.Start();
 
-        var output = await process.StandardOutput.ReadToEndAsync();
-        var errors = await process.StandardError.ReadToEndAsync();
+        var outputTask = process.StandardOutput.ReadToEndAsync();
+        var errorsTask = process.StandardError.ReadToEndAsync();
 
-        await process.WaitForExitAsync();
+        try
+        {
+            await process.WaitForExitAsync(linkedCts.Token);
+        }
+        catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested
+                                                 && !cancellationToken.IsCancellationRequested)
+        {
+            await StopProcessAsync(process);
+            throw new TimeoutException($"Command '{command}' exceeded the {_timeout.TotalSeconds:0}-second timeout.");
+        }
+        catch (OperationCanceledException)
+        {
+            await StopProcessAsync(process);
+            throw;
+        }
+
+        var output = await outputTask;
+        var errors = await errorsTask;
 
         if (process.ExitCode != 0)
         {
@@ -34,6 +66,23 @@ public static class ShellCommandRunner
         }
 
         return output.Trim();
+    }
+
+    private static async Task StopProcessAsync(Process process)
+    {
+        try
+        {
+            if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+            }
+
+            await process.WaitForExitAsync();
+        }
+        catch
+        {
+            // Best effort. The process may have exited between the checks.
+        }
     }
 
     public static string GetShellExecutable(string command)

@@ -26,7 +26,7 @@ public class SubscriptionProbeHandler(
         await throttler.WaitAsync(token);
         try
         {
-            var hasApps = await azureResourceService.HasAnyFunctionAppsAsync(sub.Id);
+            var hasApps = await azureResourceService.HasAnyFunctionAppsAsync(sub.Id, token);
             await appContext.RecordProbeResultAsync(sub.Id, hasApps);
         }
         catch (OperationCanceledException)

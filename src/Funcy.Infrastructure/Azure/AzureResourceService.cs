@@ -5,14 +5,16 @@ using Funcy.Infrastructure.Shell;
 
 namespace Funcy.Infrastructure.Azure;
 
-public class AzureResourceService : IAzureResourceService
+public class AzureResourceService(IShellCommandRunner commandRunner) : IAzureResourceService
 {
-    public async Task<string> GetCurrentSubscriptionId()
+    public async Task<string> GetCurrentSubscriptionId(CancellationToken cancellationToken = default)
     {
-        return await ShellCommandRunner.RunAsync("az", "account show --query id -o tsv");
+        return await commandRunner.RunAsync("az", "account show --query id -o tsv", cancellationToken);
     }
     
-    public async Task<bool> HasAnyFunctionAppsAsync(string subscriptionId)
+    public async Task<bool> HasAnyFunctionAppsAsync(
+        string subscriptionId,
+        CancellationToken cancellationToken = default)
     {
         var query =
             $"Resources | where subscriptionId == '{subscriptionId}' " +
@@ -24,10 +26,14 @@ public class AzureResourceService : IAzureResourceService
         try
         {
             var graphArgs = BuildGraphArgs(query, 1, null);
-            var json = await ShellCommandRunner.RunAsync("az", graphArgs);
+            var json = await commandRunner.RunAsync("az", graphArgs, cancellationToken);
             var response = JsonSerializer.Deserialize<GraphQueryResponse>(json,
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
             return response?.Count > 0;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch
         {
@@ -35,7 +41,9 @@ public class AzureResourceService : IAzureResourceService
         }
     }
 
-    public async Task<List<FunctionAppGraphRow>> GetAllFunctionApps(string subscriptionId)
+    public async Task<List<FunctionAppGraphRow>> GetAllFunctionApps(
+        string subscriptionId,
+        CancellationToken cancellationToken = default)
     {
         var options = new JsonSerializerOptions
         {
@@ -55,7 +63,7 @@ public class AzureResourceService : IAzureResourceService
         while (true)
         {
             var graphQuery = BuildGraphArgs(query, pageSize, skipToken);
-            var functionJson = await ShellCommandRunner.RunAsync("az", graphQuery);
+            var functionJson = await commandRunner.RunAsync("az", graphQuery, cancellationToken);
             var response = JsonSerializer.Deserialize<GraphQueryResponse>(functionJson, options);
             if (response is null)
             {
@@ -74,21 +82,40 @@ public class AzureResourceService : IAzureResourceService
         return results;
     }
     
-    public async Task<IReadOnlyList<(string Id, string Name)>> GetServiceBusNamespacesAsync(string subscriptionId)
+    public async Task<IReadOnlyList<(string Id, string Name)>> GetServiceBusNamespacesAsync(
+        string subscriptionId,
+        CancellationToken cancellationToken = default)
     {
         var query =
             $"Resources | where subscriptionId == '{subscriptionId}' " +
             "| where type =~ 'microsoft.servicebus/namespaces' " +
             "| project id, name";
 
-        var graphArgs = BuildGraphArgs(query, 100, null);
-        var json = await ShellCommandRunner.RunAsync("az", graphArgs);
-        var response = JsonSerializer.Deserialize<NamespaceGraphResponse>(json,
-            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-        return response?.Data.Select(n => (n.Id, n.Name)).ToList() ?? [];
+        const int pageSize = 1000;
+        var results = new List<(string Id, string Name)>();
+        string? skipToken = null;
+
+        do
+        {
+            var graphArgs = BuildGraphArgs(query, pageSize, skipToken);
+            var json = await commandRunner.RunAsync("az", graphArgs, cancellationToken);
+            var response = JsonSerializer.Deserialize<NamespaceGraphResponse>(json,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            if (response is null)
+            {
+                throw new InvalidOperationException("Failed to deserialize Service Bus namespace response");
+            }
+
+            results.AddRange(response.Data.Select(n => (n.Id, n.Name)));
+            skipToken = response.SkipToken;
+        } while (!string.IsNullOrWhiteSpace(skipToken));
+
+        return results;
     }
 
-    public async Task<string?> GetServiceBusNamespaceIdAsync(string namespaceName)
+    public async Task<string?> GetServiceBusNamespaceIdAsync(
+        string namespaceName,
+        CancellationToken cancellationToken = default)
     {
         // Not filtered to a subscription: a function may reference a namespace in a different one.
         var query =
@@ -97,7 +124,7 @@ public class AzureResourceService : IAzureResourceService
             "| project id, name";
 
         var graphArgs = BuildGraphArgs(query, 1, null);
-        var json = await ShellCommandRunner.RunAsync("az", graphArgs);
+        var json = await commandRunner.RunAsync("az", graphArgs, cancellationToken);
         var response = JsonSerializer.Deserialize<NamespaceGraphResponse>(json,
             new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
         return response?.Data.FirstOrDefault()?.Id;
@@ -129,9 +156,10 @@ public class AzureResourceService : IAzureResourceService
 
 public interface IAzureResourceService
 {
-    Task<string> GetCurrentSubscriptionId();
-    Task<List<FunctionAppGraphRow>> GetAllFunctionApps(string subscriptionId);
-    Task<bool> HasAnyFunctionAppsAsync(string subscriptionId);
-    Task<IReadOnlyList<(string Id, string Name)>> GetServiceBusNamespacesAsync(string subscriptionId);
-    Task<string?> GetServiceBusNamespaceIdAsync(string namespaceName);
+    Task<string> GetCurrentSubscriptionId(CancellationToken cancellationToken = default);
+    Task<List<FunctionAppGraphRow>> GetAllFunctionApps(string subscriptionId, CancellationToken cancellationToken = default);
+    Task<bool> HasAnyFunctionAppsAsync(string subscriptionId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<(string Id, string Name)>> GetServiceBusNamespacesAsync(
+        string subscriptionId, CancellationToken cancellationToken = default);
+    Task<string?> GetServiceBusNamespaceIdAsync(string namespaceName, CancellationToken cancellationToken = default);
 }

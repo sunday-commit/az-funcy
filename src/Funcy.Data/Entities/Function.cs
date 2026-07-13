@@ -14,9 +14,8 @@ public class Function
     public string? SubscriptionName { get; init; }
     public string? ConnectionSetting { get; init; }
 
-    // ARM id of the Service Bus namespace this function's trigger targets, resolved once (from the
-    // connection setting or by probing) and then persisted so later refreshes skip the lookup.
-    // Settable because it is filled in after the row is first written from Azure.
+    // ARM id of the Service Bus namespace this function's trigger targets. It is persisted so later
+    // refreshes can use a direct lookup, and updated when the connection setting points elsewhere.
     public string? ServiceBusNamespaceId { get; set; }
 
     public bool IsDisabled { get; set; }

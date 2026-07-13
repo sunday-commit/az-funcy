@@ -15,6 +15,7 @@ using Funcy.Console.Ui.State;
 using Funcy.Core.Interfaces;
 using Funcy.Data;
 using Funcy.Infrastructure.Azure;
+using Funcy.Infrastructure.Data;
 using Funcy.Infrastructure.Shell;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -91,6 +92,7 @@ var host = Host.CreateDefaultBuilder(args)
         });
         services.AddSingleton(sp => new LogsQueryClient(sp.GetRequiredService<DefaultAzureCredential>()));
         services.AddSingleton<ILogQueryExecutor, LogQueryExecutor>();
+        services.AddSingleton<IAppInsightsResourceIdLookup, AppInsightsResourceIdLookup>();
         services.AddSingleton<IAppInsightsResolver, AppInsightsResolver>();
         services.AddSingleton<AnimationHandler>();
         services.AddSingleton<IAnimationProvider>(sp => sp.GetRequiredService<AnimationHandler>());
@@ -109,8 +111,10 @@ var host = Host.CreateDefaultBuilder(args)
         services.AddSingleton<IAppSettingsService, AppSettingsService>();
         services.AddSingleton<IKeyVaultSecretResolver, KeyVaultSecretResolver>();
         services.AddSingleton<IClipboardService, ClipboardService>();
+        services.AddSingleton<IShellCommandRunner, ShellCommandRunner>();
         services.AddScoped<IAzureResourceService, AzureResourceService>();
         services.AddSingleton<IServiceBusInsightService, ServiceBusInsightService>();
+        services.AddSingleton<DatabaseWriteCoordinator>();
         services.AddSingleton<TokenCredential, DefaultAzureCredential>();
         services.AddTransient<ToolValidationService>();
         services.AddTransient<SplashScreen>();
@@ -122,17 +126,17 @@ var host = Host.CreateDefaultBuilder(args)
 
 var splashScreen = host.Services.GetRequiredService<SplashScreen>();
 
-// Starta AnimationHandler för splash screen spinner
+// Start the AnimationHandler for the splash screen spinner
 var animationHandler = host.Services.GetRequiredService<AnimationHandler>();
 var animationCts = new CancellationTokenSource();
 var animationTask = animationHandler.StartAsync(animationCts.Token);
 
-// Starta bakgrundsuppgifter som körs under splash screen
+// Start background tasks that run during the splash screen
 var dbMigrationTask = host.Services.MigrateDatabaseAsync(CancellationToken.None);
 var appContext = host.Services.GetRequiredService<AppContext>();
 var appContextInitTask = appContext.InitializeAppContext();
 
-// Starta subscription probe direkt när subscriptions laddats - väntar i splash screen
+// Start the subscription probe as soon as subscriptions are loaded - awaited in the splash screen
 var subscriptionProbeHandler = host.Services.GetRequiredService<SubscriptionProbeHandler>();
 var probeTask = appContextInitTask.ContinueWith(
     t => t.IsCompletedSuccessfully
@@ -140,7 +144,7 @@ var probeTask = appContextInitTask.ContinueWith(
         : Task.CompletedTask,
     TaskScheduler.Default).Unwrap();
 
-// Hämta functionAppUpdateHandler för continuation
+// Resolve the functionAppUpdateHandler for the continuation
 var functionAppUpdateHandler = host.Services.GetRequiredService<FunctionAppUpdateHandler>();
 
 var canContinue = await splashScreen.ShowAsync(
@@ -153,22 +157,22 @@ if (!canContinue)
     return;
 }
 
-// Övervaka az-sessionen i bakgrunden: proaktiv probe + reaktiva rapporter, samt in-app re-login.
-// Startas efter splash så den aldrig fördröjer uppstarten och lever hela appens livstid.
+// Monitor the az session in the background: proactive probe + reactive reports, plus in-app re-login.
+// Started after the splash so it never delays startup and lives for the whole app lifetime.
 var sessionMonitor = host.Services.GetRequiredService<IAzureSessionMonitor>();
 sessionMonitor.ReAuthenticatedCallback = () => functionAppUpdateHandler.LoadAllDetailsAsync();
 var sessionCts = new CancellationTokenSource();
 var sessionMonitorTask = sessionMonitor.RunProbeLoopAsync(sessionCts.Token);
 
-// AnimationHandler fortsätter köra för AppOrchestrator
+// The AnimationHandler keeps running for the AppOrchestrator
 var mainMenuService = host.Services.GetRequiredService<AppOrchestrator>();
 await mainMenuService.StartAsync();
 
-// Stoppa animation efter att huvudmenyn är klar
+// Stop the animation after the main menu is done
 await animationCts.CancelAsync();
 await animationTask;
 
-// Stoppa sessionsövervakningen och avbryt ev. pågående re-login rent.
+// Stop the session monitor and cancel any in-flight re-login cleanly.
 await sessionCts.CancelAsync();
 (sessionMonitor as IDisposable)?.Dispose();
 try
@@ -177,7 +181,7 @@ try
 }
 catch (OperationCanceledException)
 {
-    // Förväntat vid nedstängning.
+    // Expected on shutdown.
 }
 
 await host.RunAsync();

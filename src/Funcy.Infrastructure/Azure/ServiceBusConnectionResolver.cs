@@ -1,5 +1,7 @@
 namespace Funcy.Infrastructure.Azure;
 
+using Funcy.Core.KeyVault;
+
 // Resolves a Service Bus namespace name from a function app's application settings, following
 // the same lookup rules the Azure Functions runtime uses for a serviceBusTrigger connection.
 //
@@ -15,7 +17,10 @@ public sealed class ServiceBusConnectionResolver(IReadOnlyDictionary<string, str
     public const string DefaultConnectionSetting = "AzureWebJobsServiceBus";
 
     public string? ResolveNamespace(string? connectionSetting)
-        => ExtractNamespace(ResolveConnectionValue(connectionSetting));
+    {
+        var value = ResolveConnectionValue(connectionSetting);
+        return KeyVaultReferenceParser.TryParse(value, out _) ? null : ExtractNamespace(value);
+    }
 
     // Returns the raw app-setting value the namespace is extracted from — a fully qualified
     // namespace host, a Service Bus connection string, or a @Microsoft.KeyVault(...) reference the

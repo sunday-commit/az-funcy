@@ -56,4 +56,37 @@ public class ServiceBusInsightServiceTests
 
         Assert.Equal("%OrderQueue%", queueName);
     }
+
+    [Fact]
+    public void SelectCachedNamespaceId_WhenConfigurationIsUnchanged_KeepsFastPath()
+    {
+        const string namespaceId =
+            "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg/providers/Microsoft.ServiceBus/namespaces/orders";
+
+        var selected = ServiceBusInsightService.SelectCachedNamespaceId(namespaceId, "orders");
+
+        Assert.Equal(namespaceId, selected);
+    }
+
+    [Fact]
+    public void SelectCachedNamespaceId_WhenConfigurationChanged_InvalidatesCache()
+    {
+        const string namespaceId =
+            "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg/providers/Microsoft.ServiceBus/namespaces/orders-old";
+
+        var selected = ServiceBusInsightService.SelectCachedNamespaceId(namespaceId, "orders-new");
+
+        Assert.Null(selected);
+    }
+
+    [Fact]
+    public void SelectCachedNamespaceId_WhenConfigurationCannotBeResolved_KeepsFastPath()
+    {
+        const string namespaceId =
+            "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg/providers/Microsoft.ServiceBus/namespaces/orders";
+
+        var selected = ServiceBusInsightService.SelectCachedNamespaceId(namespaceId, null);
+
+        Assert.Equal(namespaceId, selected);
+    }
 }

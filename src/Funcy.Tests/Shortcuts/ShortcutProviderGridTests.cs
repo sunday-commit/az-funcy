@@ -211,7 +211,7 @@ public class ShortcutProviderGridTests
     public void Subscription_Grid_DefaultHideEmpty_ShowsShowAllShortcut()
     {
         // AppContext.HideEmptySubscriptions defaults to true => "Show all" shortcut is offered.
-        var sut = new SubscriptionShortcutProvider(new AppContext(null!, null!, null!));
+        var sut = new SubscriptionShortcutProvider(new AppContext(null!, null!, null!, null!));
         var grid = sut.Describe(Sub());
 
         Assert.Equal(new ShortcutMap(ListPanelShortcuts.Filter, true), grid[new TableIndex(0, 2)]);
@@ -222,7 +222,7 @@ public class ShortcutProviderGridTests
     [Fact]
     public void Subscription_Grid_AfterToggle_ShowsHideEmptyShortcut()
     {
-        var ctx = new AppContext(null!, null!, null!);
+        var ctx = new AppContext(null!, null!, null!, null!);
         ctx.ToggleHideEmptySubscriptions(); // now false
         var sut = new SubscriptionShortcutProvider(ctx);
         var grid = sut.Describe(Sub());
@@ -232,7 +232,7 @@ public class ShortcutProviderGridTests
     [Fact]
     public void Subscription_Grid_NullSelection_DisablesToggleVisibility()
     {
-        var sut = new SubscriptionShortcutProvider(new AppContext(null!, null!, null!));
+        var sut = new SubscriptionShortcutProvider(new AppContext(null!, null!, null!, null!));
         var grid = sut.Describe(null);
         Assert.False(grid[new TableIndex(0, 4)].IsEnabled);
     }
@@ -244,7 +244,7 @@ public class ShortcutProviderGridTests
     [InlineData(FunctionAction.Refresh, false)]
     public void Subscription_IsActionValid(FunctionAction action, bool expected)
     {
-        var sut = new SubscriptionShortcutProvider(new AppContext(null!, null!, null!));
+        var sut = new SubscriptionShortcutProvider(new AppContext(null!, null!, null!, null!));
         Assert.Equal(expected, sut.IsActionValid(Sub(), action));
     }
 }

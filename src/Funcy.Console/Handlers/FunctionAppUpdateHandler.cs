@@ -341,9 +341,10 @@ public class FunctionAppUpdateHandler : IDetailsLoader
                     ? ServiceBusCountStatus.Loaded
                     : ServiceBusCountStatus.Failed;
 
-                // First-time namespace resolution: cache it on the model and stage it for the
-                // one-time SQLite write so future refreshes skip the lookup entirely.
-                if (string.IsNullOrEmpty(function.ServiceBusNamespaceId) && !string.IsNullOrEmpty(result.NamespaceId))
+                // Persist both first-time resolutions and configuration-driven namespace changes.
+                if (!string.IsNullOrEmpty(result.NamespaceId)
+                    && !string.Equals(function.ServiceBusNamespaceId, result.NamespaceId,
+                        StringComparison.OrdinalIgnoreCase))
                 {
                     function.ServiceBusNamespaceId = result.NamespaceId;
                     newlyResolvedNamespaces.Add((function.Name, result.NamespaceId));

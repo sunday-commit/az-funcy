@@ -328,6 +328,11 @@ public class FunctionAppUpdateHandler : IDetailsLoader
 
             var byKey = serviceBusFunctions.ToDictionary(f => f.Key);
             var newlyResolvedNamespaces = new List<(string FunctionName, string NamespaceId)>();
+            var permissionError = results.Select(r => r.ErrorMessage).FirstOrDefault(m => m is not null);
+            if (permissionError is not null)
+            {
+                _uiErrorLog.Report(app.Name, permissionError);
+            }
             foreach (var result in results)
             {
                 if (!byKey.TryGetValue(result.FunctionKey, out var function))

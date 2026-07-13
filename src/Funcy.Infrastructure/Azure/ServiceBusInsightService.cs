@@ -103,7 +103,10 @@ public class ServiceBusInsightService(
         catch (Exception e)
         {
             logger.LogError(e, "Failed to fetch Service Bus counts for function {Function}", function.Key);
-            return Failed(function, queueName, topicName, subscriptionName);
+            var error = AzurePermissionError.IsAccessDenied(e)
+                ? AzurePermissionError.Required("Service Bus counts", "Reader on the Service Bus namespace")
+                : null;
+            return Failed(function, queueName, topicName, subscriptionName, error);
         }
     }
 
@@ -323,8 +326,10 @@ public class ServiceBusInsightService(
     }
 
     private static ServiceBusCountResult Failed(
-        FunctionDetails function, string? queueName, string? topicName, string? subscriptionName)
-        => new(function.Key, null, null, false, queueName, topicName, subscriptionName);
+        FunctionDetails function, string? queueName, string? topicName, string? subscriptionName,
+        string? errorMessage = null)
+        => new(function.Key, null, null, false, queueName, topicName, subscriptionName,
+            ErrorMessage: errorMessage);
 
     private static bool HasPlaceholder(string? value) => value?.Contains('%') == true;
 

@@ -5,6 +5,7 @@ using Funcy.Console.Ui.Panels.Interfaces;
 using Funcy.Console.Ui.Shortcuts;
 using Funcy.Core.Interfaces;
 using Funcy.Core.Model;
+using Azure;
 using Microsoft.Extensions.Logging.Abstractions;
 using Spectre.Console;
 using Xunit;
@@ -64,6 +65,18 @@ public class AppSettingsListControllerTests
 
         Assert.Empty(view.LastSetAll);
         Assert.NotNull(emptyState.Message);
+    }
+
+    [Fact]
+    public void Load_WhenAccessIsDenied_ExplainsRequiredPermission()
+    {
+        var emptyState = new AppSettingsEmptyState();
+
+        _ = Build(new FakeAppSettingsView(),
+            new ThrowingAppSettingsService(new RequestFailedException(403, "Forbidden")),
+            new FakeSecretResolver("secret"), emptyState);
+
+        Assert.Contains("Website Contributor", emptyState.Message);
     }
 
     [Fact]
@@ -130,6 +143,20 @@ public class AppSettingsListControllerTests
 
         Assert.Equal(SecretResolutionState.Failed, setting.ResolutionState);
         Assert.Null(setting.ResolvedValue);
+    }
+
+    [Fact]
+    public void ToggleMask_WhenKeyVaultAccessIsDenied_ExplainsRequiredPermission()
+    {
+        var view = new FakeAppSettingsView();
+        var setting = KeyVault("A");
+        var controller = Build(view, new FakeAppSettingsService([setting]),
+            new ThrowingSecretResolver(new RequestFailedException(403, "Forbidden")), new AppSettingsEmptyState());
+        view.SelectedKey = "A";
+
+        controller.ToggleSelectedMask();
+
+        Assert.Contains("Key Vault Secrets User", setting.ResolutionErrorMessage);
     }
 
     [Fact]
@@ -205,10 +232,10 @@ public class AppSettingsListControllerTests
             CancellationToken cancellationToken) => Task.FromResult(settings);
     }
 
-    private sealed class ThrowingAppSettingsService : IAppSettingsService
+    private sealed class ThrowingAppSettingsService(Exception? exception = null) : IAppSettingsService
     {
         public Task<IReadOnlyList<AppSettingDetails>> GetApplicationSettingsAsync(string appArmId,
-            CancellationToken cancellationToken) => throw new InvalidOperationException("boom");
+            CancellationToken cancellationToken) => throw exception ?? new InvalidOperationException("boom");
     }
 
     private sealed class FakeSecretResolver(string value) : IKeyVaultSecretResolver
@@ -222,10 +249,10 @@ public class AppSettingsListControllerTests
         }
     }
 
-    private sealed class ThrowingSecretResolver : IKeyVaultSecretResolver
+    private sealed class ThrowingSecretResolver(Exception? exception = null) : IKeyVaultSecretResolver
     {
         public Task<string> ResolveAsync(KeyVaultReference reference, CancellationToken cancellationToken)
-            => throw new UnauthorizedAccessException("denied");
+            => throw exception ?? new UnauthorizedAccessException("denied");
     }
 
     private sealed class FakeAppSettingsView : IListPanelView<AppSettingDetails>

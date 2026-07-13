@@ -32,6 +32,11 @@ public sealed class AppInsightsResolver(IAppInsightsResourceIdLookup lookup) : I
             RemoveFailedTask(functionAppArmId, task);
             throw;
         }
+        catch (Exception e) when (AzurePermissionError.IsAccessDenied(e))
+        {
+            RemoveFailedTask(functionAppArmId, task);
+            throw;
+        }
         catch
         {
             // Never crash the panel over telemetry resolution. Evict failures so reopening the

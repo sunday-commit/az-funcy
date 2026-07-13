@@ -142,7 +142,7 @@ public sealed class ListPanelContextFactory(
             {
                 var view = (IListPanelView<FunctionDetails>)panel;
                 var controller = new FunctionListController(view, app.Key, app.Functions, coordinator,
-                    serviceBusInsightService, functionListLogger, uiStatusState, invalidate);
+                    serviceBusInsightService, functionListLogger, uiStatusState, invalidate, errorLog);
                 return new ListPanelContext
                 {
                     View = panel,

@@ -2,6 +2,7 @@ using Funcy.Console.Ui.Panels.Interfaces;
 using Funcy.Core.Interfaces;
 using Funcy.Core.Model;
 using Microsoft.Extensions.Logging;
+using Funcy.Infrastructure.Azure;
 
 namespace Funcy.Console.Ui.Controllers;
 
@@ -12,7 +13,7 @@ public sealed class AppSettingsListController : ListPanelControllerBase<AppSetti
 
     private static readonly string LoadingMessage = $"[{UiStyles.Hint}]Loading environment variables…[/]";
     private static readonly string EmptyMessage = $"[{UiStyles.Hint}]No environment variables found.[/]";
-    private static readonly string ErrorMessage =
+    private static readonly string GenericErrorMessage =
         $"[{UiStyles.Danger}]Failed to load environment variables. See the log for details.[/]";
 
     private readonly string _appArmId;
@@ -86,7 +87,13 @@ public sealed class AppSettingsListController : ListPanelControllerBase<AppSetti
         catch (Exception e)
         {
             _logger.LogError(e, "Failed to load application settings for {FunctionAppName}", _appName);
-            _emptyState.Message = ErrorMessage;
+            var message = AzurePermissionError.IsAccessDenied(e)
+                ? AzurePermissionError.Required("Environment variables",
+                    "Website Contributor on the Function App")
+                : "Failed to load environment variables. See the log for details.";
+            _emptyState.Message = AzurePermissionError.IsAccessDenied(e)
+                ? $"[{UiStyles.Danger}]{message}[/]"
+                : GenericErrorMessage;
             _invalidate?.Invoke();
         }
     }
@@ -140,6 +147,7 @@ public sealed class AppSettingsListController : ListPanelControllerBase<AppSetti
 
             item.ResolvedValue = value;
             item.ResolutionState = SecretResolutionState.Resolved;
+            item.ResolutionErrorMessage = null;
         }
         catch (OperationCanceledException)
         {
@@ -149,6 +157,9 @@ public sealed class AppSettingsListController : ListPanelControllerBase<AppSetti
         {
             _logger.LogError(e, "Failed to resolve Key Vault secret for setting {SettingName}", item.Name);
             item.ResolutionState = SecretResolutionState.Failed;
+            item.ResolutionErrorMessage = AzurePermissionError.IsAccessDenied(e)
+                ? "Access denied. Required: Key Vault Secrets User."
+                : "Could not resolve secret. Check the log for details.";
         }
 
         View.Upsert(item);

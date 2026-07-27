@@ -4,6 +4,11 @@ az-funcy is a terminal-based (TUI) tool for monitoring and administering **Azure
 
 It is built with **Spectre.Console** and inspired by tools like **btop** and **k9s**, focusing on fast feedback, keyboard-driven workflows, and minimal friction.
 
+![az-funcy demo](docs/assets/demo.gif)
+
+*Recorded from `funcy --demo`, which runs the whole UI on fabricated data. No Azure subscription
+needed to try it.*
+
 ---
 
 ## Features
@@ -105,6 +110,21 @@ the role assignment is correct.
 On startup, az-funcy:
 1. Loads Function Apps from a local database cache (fast)
 2. Refreshes data from Azure in the background
+
+### Try it without an Azure subscription
+
+```bash
+funcy --demo
+```
+
+Demo mode runs the full UI against a fabricated estate: no Azure access, no Azure CLI and no login
+required. It is useful for looking around before pointing the tool at a real tenant, and it is what
+the screencast above is recorded from.
+
+The UI is labelled `DEMO DATA` for as long as the mode is active. It has to be asked for with that
+exact flag; az-funcy never falls back to demo data when a real Azure call fails. Its database,
+settings and logs live in a `demo` sub-directory of the normal data directory, so a demo run leaves
+your real cache and settings untouched.
 
 ---
 

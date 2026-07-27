@@ -6,5 +6,7 @@ src/Funcy.Console/functionapps.db
 .claude/
 Funcy.sln.DotSettings.user
 /packages/
+/nupkg/
 riderModule.iml
 /_ReSharper.Caches/
+docs/assets/demo-raw.mp4

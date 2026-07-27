@@ -23,7 +23,7 @@ public class TopPanel
     private int _nameWidth = MinNameWidth;
     public Panel Panel { get; }
 
-    public TopPanel(AppContext appContext, Func<int>? windowWidth = null)
+    public TopPanel(AppContext appContext, bool isDemoMode = false, Func<int>? windowWidth = null)
     {
         _windowWidth = windowWidth ?? (() => System.Console.WindowWidth);
         _subscriptionName = appContext.CurrentSubscription.Name;
@@ -43,6 +43,13 @@ public class TopPanel
             Width = AdaptiveLayout.PanelWidth(AdaptiveLayout.MinTableWidth)
         };
         Panel.BorderColor(Color.Orange1);
+
+        // Demo mode is marked on the panel border itself, so the label is present in every frame
+        // rather than in a status line that other messages take over.
+        if (isDemoMode)
+        {
+            Panel.Header = new PanelHeader(UiStyles.CreateDemoHeaderMarkup());
+        }
 
         // Size to the terminal before the first render so the subscription name is not squeezed.
         ApplyAdaptiveWidth();

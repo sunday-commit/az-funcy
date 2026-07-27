@@ -55,7 +55,8 @@ public sealed class MainContainer : IDisposable
         IAzureSessionMonitor sessionMonitor,
         ITagCatalog tagCatalog,
         IFuncySettingsService settingsService,
-        IClipboardService clipboard)
+        IClipboardService clipboard,
+        DemoModeInfo demoMode)
     {
         _listPanelContextFactory = listPanelContextFactory;
         _actionDispatcher = actionDispatcher;
@@ -68,7 +69,7 @@ public sealed class MainContainer : IDisposable
         _settingsService = settingsService;
         _clipboard = clipboard;
         _settingsService.ColumnsChanged += RebuildRootPanel;
-        _topPanel = new TopPanel(appContext);
+        _topPanel = new TopPanel(appContext, demoMode.IsEnabled);
 
         // New errors arrive on background threads; wake the render loop so the indicator updates.
         _errorLog.Changed += OnErrorLogChanged;

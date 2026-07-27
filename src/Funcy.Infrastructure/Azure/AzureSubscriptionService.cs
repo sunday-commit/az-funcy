@@ -5,7 +5,14 @@ using Funcy.Core.Model;
 
 namespace Funcy.Infrastructure.Azure;
 
+// Lists the subscriptions the signed-in identity can see, flagging the one az considers current.
+public interface ISubscriptionService
+{
+    Task<List<SubscriptionDetails>> GetSubscriptions();
+}
+
 public class AzureSubscriptionService(IAzureResourceService azureResourceService, ArmClient client)
+    : ISubscriptionService
 {
     public async Task<List<SubscriptionDetails>> GetSubscriptions()
     {

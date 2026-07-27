@@ -6,20 +6,29 @@ namespace Funcy.Data;
 
 public static class DatabaseConnectionFactory
 {
-    public static string CreateConnectionString(IConfiguration configuration)
+    public static string CreateConnectionString(IConfiguration configuration, string? subDirectory = null)
     {
         var baseConnectionString = configuration.GetConnectionString("DefaultConnection");
         var builder = new SqliteConnectionStringBuilder(baseConnectionString);
 
         var fileName = Path.GetFileName(builder.DataSource);
-        var baseDirectory = GetDataDirectory();
+        var baseDirectory = GetDataDirectory(subDirectory);
         Directory.CreateDirectory(baseDirectory);
 
         builder.DataSource = Path.Combine(baseDirectory, fileName);
         return builder.ToString();
     }
 
-    public static string GetDataDirectory()
+    /// <summary>The per-user data directory. <paramref name="subDirectory"/> nests it one level
+    /// deeper, which demo mode uses to keep its database, settings and logs away from the real
+    /// ones.</summary>
+    public static string GetDataDirectory(string? subDirectory = null)
+    {
+        var root = GetRootDataDirectory();
+        return string.IsNullOrEmpty(subDirectory) ? root : Path.Combine(root, subDirectory);
+    }
+
+    private static string GetRootDataDirectory()
     {
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {

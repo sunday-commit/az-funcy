@@ -1,23 +1,12 @@
 using System.Text;
-using Azure.Core;
-using Azure.Identity;
-using Azure.Monitor.Query;
-using Azure.ResourceManager;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Funcy.Console;
 using Funcy.Console.Handlers;
-using Funcy.Console.Handlers.Concurrency;
-using Funcy.Console.Settings;
 using Funcy.Console.Ui;
-using Funcy.Console.Ui.Factory;
-using Funcy.Console.Ui.State;
-using Funcy.Core.Interfaces;
 using Funcy.Data;
+using Funcy.Demo;
 using Funcy.Infrastructure.Azure;
-using Funcy.Infrastructure.Data;
-using Funcy.Infrastructure.Shell;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Serilog;
@@ -25,21 +14,37 @@ using AppContext = Funcy.Console.AppContext;
 
 Console.OutputEncoding = Encoding.UTF8;
 
-var dataDirectory = DatabaseConnectionFactory.GetDataDirectory();
+// Demo mode must be asked for explicitly; it is never entered as a fallback.
+var demoMode = DemoMode.IsRequested(args);
+// The flag is ours, not a configuration key, so keep it out of the host's command-line provider.
+var hostArgs = args.Where(arg => arg != DemoMode.Flag).ToArray();
+
+var dataDirectory = DatabaseConnectionFactory.GetDataDirectory(ServiceRegistration.DataSubDirectory(demoMode));
 Directory.CreateDirectory(dataDirectory);
 
 var settingsPath = Path.Combine(dataDirectory, "settings.json");
 if (!File.Exists(settingsPath))
 {
-    await File.WriteAllTextAsync(settingsPath,
-        """
-        {
-          "Funcy": {
-            "TagColumns": [ "System" ],
-            "SubscriptionRefreshIntervalMinutes": 60
+    // The demo ships with the Service Bus columns on: they are the point of the walkthrough, and a
+    // demo run has its own settings file so this never changes what a real run shows.
+    await File.WriteAllTextAsync(settingsPath, demoMode
+        ? """
+          {
+            "Funcy": {
+              "TagColumns": [ "System" ],
+              "SubscriptionRefreshIntervalMinutes": 60,
+              "ShowServiceBusInAppList": true
+            }
           }
-        }
-        """);
+          """
+        : """
+          {
+            "Funcy": {
+              "TagColumns": [ "System" ],
+              "SubscriptionRefreshIntervalMinutes": 60
+            }
+          }
+          """);
 }
 
 var config = new ConfigurationBuilder()
@@ -57,71 +62,14 @@ Log.Logger = new LoggerConfiguration()
     .ReadFrom.Configuration(config)
     .CreateLogger();
 
-var host = Host.CreateDefaultBuilder(args)
+var host = Host.CreateDefaultBuilder(hostArgs)
     .UseContentRoot(System.AppContext.BaseDirectory)
     .ConfigureLogging(logging =>
     {
         logging.ClearProviders();
         logging.AddSerilog();
     })
-    .ConfigureServices((_, services) =>
-    {
-        services.Configure<FuncySettings>(config.GetSection("Funcy"));
-        services.AddSingleton<IFuncySettingsService, FuncySettingsService>();
-        services.AddTransient<ITagCatalog, TagCatalog>();
-        services.AddMemoryCache();
-        services.AddDbContextFactory<FunctionAppDbContext>(options =>
-        {
-            var connectionString = DatabaseConnectionFactory.CreateConnectionString(config);
-            options.UseSqlite(connectionString)
-                .UseLoggerFactory(LoggerFactory.Create(builder =>
-                {
-                    builder.AddSerilog().SetMinimumLevel(LogLevel.Information);
-                })).EnableSensitiveDataLogging();
-        });
-        
-        services.AddTransient<InputHandler>();
-        services.AddSingleton<FunctionAppUpdateHandler>();
-        services.AddTransient<ResizeHandler>();
-        services.AddTransient<IActionDispatcher, FunctionActionHandler>();
-        services.AddSingleton<DefaultAzureCredential>();
-        services.AddSingleton(sp =>
-        {
-            var credential = sp.GetRequiredService<DefaultAzureCredential>();
-            return new ArmClient(credential);
-        });
-        services.AddSingleton(sp => new LogsQueryClient(sp.GetRequiredService<DefaultAzureCredential>()));
-        services.AddSingleton<ILogQueryExecutor, LogQueryExecutor>();
-        services.AddSingleton<IAppInsightsResourceIdLookup, AppInsightsResourceIdLookup>();
-        services.AddSingleton<IAppInsightsResolver, AppInsightsResolver>();
-        services.AddSingleton<AnimationHandler>();
-        services.AddSingleton<IAnimationProvider>(sp => sp.GetRequiredService<AnimationHandler>());
-        services.AddSingleton<FunctionStateCoordinator>();
-        services.AddSingleton<IUiStatusState, UiStatusState>();
-        services.AddSingleton<IUiErrorLog, UiErrorLog>();
-        services.AddSingleton<AppContext>();
-        services.AddTransient<FunctionStatusManager>();
-        services.AddTransient<AzureSubscriptionService>();
-        services.AddTransient<UiStateMarkupProvider>();
-        services.AddTransient<AppOrchestrator>();
-        services.AddTransient<ListPanelContextFactory>();
-        services.AddTransient<ListPanelFactory>();
-        services.AddTransient<IAzureFunctionService, AzureFunctionService>();
-        services.AddTransient<IFunctionAppManagementService, FunctionAppManagementService>();
-        services.AddSingleton<IAppSettingsService, AppSettingsService>();
-        services.AddSingleton<IKeyVaultSecretResolver, KeyVaultSecretResolver>();
-        services.AddSingleton<IClipboardService, ClipboardService>();
-        services.AddSingleton<IShellCommandRunner, ShellCommandRunner>();
-        services.AddScoped<IAzureResourceService, AzureResourceService>();
-        services.AddSingleton<IServiceBusInsightService, ServiceBusInsightService>();
-        services.AddSingleton<DatabaseWriteCoordinator>();
-        services.AddSingleton<TokenCredential, DefaultAzureCredential>();
-        services.AddTransient<ToolValidationService>();
-        services.AddTransient<SplashScreen>();
-        services.AddTransient<SubscriptionProbeHandler>();
-        services.AddSingleton<IAzureCliSession, AzureCliSession>();
-        services.AddSingleton<IAzureSessionMonitor, AzureSessionMonitor>();
-    })
+    .ConfigureServices((_, services) => services.AddFuncy(config, demoMode))
     .Build();
 
 var splashScreen = host.Services.GetRequiredService<SplashScreen>();

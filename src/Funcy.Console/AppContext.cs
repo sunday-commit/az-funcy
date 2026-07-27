@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 namespace Funcy.Console;
 
 public class AppContext(
-    AzureSubscriptionService azureSubscriptionService,
+    ISubscriptionService azureSubscriptionService,
     IDbContextFactory<FunctionAppDbContext> dbFactory,
     ILogger<AppContext> logger,
     DatabaseWriteCoordinator databaseWrites)

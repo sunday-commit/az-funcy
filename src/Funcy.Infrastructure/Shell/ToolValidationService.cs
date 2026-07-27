@@ -4,7 +4,13 @@ namespace Funcy.Infrastructure.Shell;
 
 public record ToolValidationResult(bool IsValid, List<string> MissingTools, List<string> InstallInstructions);
 
-public class ToolValidationService
+// Checks that the external tools the app shells out to are present before the UI starts.
+public interface IToolValidationService
+{
+    Task<ToolValidationResult> ValidateRequiredToolsAsync();
+}
+
+public class ToolValidationService : IToolValidationService
 {
     private const int TimeoutSeconds = 10;
 

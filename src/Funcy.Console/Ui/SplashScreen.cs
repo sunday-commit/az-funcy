@@ -6,11 +6,11 @@ namespace Funcy.Console.Ui;
 
 public class SplashScreen
 {
-    private readonly ToolValidationService _toolValidationService;
+    private readonly IToolValidationService _toolValidationService;
     private readonly AnimationHandler _animationHandler;
     private const string SplashAnimationKey = "SplashScreen";
 
-    public SplashScreen(ToolValidationService toolValidationService, AnimationHandler animationHandler)
+    public SplashScreen(IToolValidationService toolValidationService, AnimationHandler animationHandler)
     {
         _toolValidationService = toolValidationService;
         _animationHandler = animationHandler;

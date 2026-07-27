@@ -1,0 +1,26 @@
+# Captions burned into the screencast by annotate-demo.sh.
+#
+# Format: <start seconds>|<end seconds>|<caption>
+#
+# Times are video timestamps in docs/assets/demo-raw.mp4 and line up with the timeline comments in
+# demo.tape. Change a Sleep there and every caption after it shifts, so re-run annotate-demo.sh and
+# spot-check the frames. Blank lines and # comments are ignored.
+#
+# Keep each caption on one line of at most 115 characters: at font size 22 a wider line runs past
+# the 1600px frame and gets clipped at both ends. annotate-demo.sh refuses to run if one is too long.
+# Say what the viewer is looking at rather than which key was pressed.
+
+1.0|6.8|az-funcy: a terminal UI for Azure Function Apps. Starting on demo data, no Azure needed.
+8.0|21.8|Every function app in the subscription, with live Service Bus counts: messages waiting and dead letters.
+22.4|29.4|Filtering down to one flow. The receiver is sitting on 12 dead letters.
+30.0|37.4|The app's own functions: trigger type, the queue or topic each one listens to, and its message counts.
+38.0|46.5|Application Insights logs for a single function, without leaving the terminal or opening the portal.
+47.0|52.6|Widening the time range from the last hour to the last six.
+55.5|57.8|Back out to the app list.
+58.5|64.0|Application settings for the app. Values are masked by default.
+64.6|66.4|Moving to a setting that is a Key Vault reference.
+66.8|72.5|Revealing it resolves the secret behind the reference, on demand and one row at a time.
+75.0|80.6|Nothing fails silently. The app whose Service Bus namespace it cannot read is listed under Issues.
+83.2|92.0|Every subscription the account can see, including the ones hidden by default because they hold no function apps.
+96.5|99.8|Back on the app list, filtered to the one app that is stopped.
+100.2|108.0|Starting it from here. The status column runs through Starting and Success as the app comes up.

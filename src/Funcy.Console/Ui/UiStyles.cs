@@ -127,6 +127,10 @@ public static class UiStyles
         }
     }
 
+    /// <summary>Header text marking the UI as showing fabricated data. Always rendered while demo
+    /// mode is active, including in any recording made from it.</summary>
+    public static string CreateDemoHeaderMarkup() => $"[{Warning}] DEMO DATA - not a real tenant [/]";
+
     public static string? CreateFunctionsEmptyStateText(FunctionAppDetails app, UiStatusSnapshot uiStatus)
     {
         if (app.Status is { Status: StatusType.InProgress, Action: FunctionAction.Start })

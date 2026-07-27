@@ -23,7 +23,8 @@ public class AppOrchestrator(
     IAzureSessionMonitor sessionMonitor,
     ITagCatalog tagCatalog,
     IFuncySettingsService settingsService,
-    IClipboardService clipboard)
+    IClipboardService clipboard,
+    DemoModeInfo demoMode)
 {
     private MainContainer _mainContainer = null!;
 
@@ -32,7 +33,8 @@ public class AppOrchestrator(
         var cts = new CancellationTokenSource();
 
         _mainContainer = new MainContainer(listPanelContextFactory, actionDispatcher, functionAppUpdateHandler,
-            uiStateMarkupProvider, errorLog, appContext, sessionMonitor, tagCatalog, settingsService, clipboard);
+            uiStateMarkupProvider, errorLog, appContext, sessionMonitor, tagCatalog, settingsService, clipboard,
+            demoMode);
         try
         {
             // InitializeAsync is now done in Program.cs before StartAsync

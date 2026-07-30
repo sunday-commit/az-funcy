@@ -17,6 +17,7 @@
         <PackageTags>azure;functions;tui;cli</PackageTags>
         <RepositoryUrl>https://github.com/sunday-commit/az-funcy</RepositoryUrl>
         <PackageReadmeFile>README.md</PackageReadmeFile>
+        <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     </PropertyGroup>
 
     <ItemGroup>

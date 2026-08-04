@@ -50,13 +50,16 @@ public class UiErrorListControllerTests
         log.Report("app-a", "boom");
 
         var view = new FakeErrorView();
-        TaskCompletionSource updated = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        using var controller = new UiErrorListController(view, log, invalidate: () => updated.TrySetResult());
-        updated = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        // The Report above leaves a coalesced Changed notification in flight, which can fire
+        // between the ctor and Clear; wait for the view to actually be empty instead of for
+        // the next invalidate.
+        TaskCompletionSource cleared = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var controller = new UiErrorListController(view, log,
+            invalidate: () => { if (view.LastSetAll.Count == 0) cleared.TrySetResult(); });
 
         log.Clear();
 
-        await updated.Task.WaitAsync(Timeout);
+        await cleared.Task.WaitAsync(Timeout);
         Assert.Empty(view.LastSetAll);
     }
 

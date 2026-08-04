@@ -23,6 +23,7 @@ public sealed class ShellCommandRunner(TimeSpan? timeout = null) : IShellCommand
         {
             FileName = GetShellExecutable(command),
             Arguments = GetShellArguments(command, arguments),
+            RedirectStandardInput = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
@@ -35,6 +36,11 @@ public sealed class ShellCommandRunner(TimeSpan? timeout = null) : IShellCommand
             cancellationToken, timeoutCts.Token);
 
         process.Start();
+
+        // The TUI owns the console, so an interactive prompt from a child process (e.g. az
+        // offering to install a missing extension) is invisible and would block until the
+        // timeout. Closing stdin makes such prompts fail fast with an EOF error instead.
+        process.StandardInput.Close();
 
         var outputTask = process.StandardOutput.ReadToEndAsync();
         var errorsTask = process.StandardError.ReadToEndAsync();

@@ -52,6 +52,7 @@ public class ToolValidationService : IToolValidationService
             {
                 FileName = ShellCommandRunner.GetShellExecutable(command),
                 Arguments = ShellCommandRunner.GetShellArguments(command, arguments),
+                RedirectStandardInput = true,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
@@ -60,6 +61,9 @@ public class ToolValidationService : IToolValidationService
 
             using var process = new Process { StartInfo = psi };
             process.Start();
+
+            // Closed stdin keeps a hidden interactive prompt from blocking the check.
+            process.StandardInput.Close();
 
             await process.WaitForExitAsync(cts.Token);
             return process.ExitCode == 0;

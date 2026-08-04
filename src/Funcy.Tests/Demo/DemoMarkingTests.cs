@@ -76,10 +76,7 @@ public sealed class DemoMarkingTests : IDisposable
 
     public void Dispose()
     {
-        if (File.Exists(_dbPath))
-        {
-            File.Delete(_dbPath);
-        }
+        try { File.Delete(_dbPath); } catch { /* best effort cleanup */ }
     }
 
     private sealed class StubSubscriptionService : ISubscriptionService

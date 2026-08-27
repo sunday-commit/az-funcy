@@ -102,9 +102,9 @@ the role assignment is correct.
    az account set --subscription "<subscription name or id>"
    ```
 
-3. Build and run:
+3. Install as dotnet tool:
    ```bash
-   dotnet run --project src/Funcy.Console
+   dotnet tool install --global az-funcy
    ```
 
 On startup, az-funcy:
